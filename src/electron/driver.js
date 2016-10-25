@@ -43,11 +43,9 @@ function Driver(options = {}) {
 
   let electron_path = options.electronPath || default_electron_path;
 
-  options.maxAuthRetries = options.maxAuthRetries || MAX_AUTH_RETRIES;
-
+  options.maxAuthRetries   = options.maxAuthRetries || MAX_AUTH_RETRIES;
   electronArgs.loadTimeout = options.loadTimeout;
-
-  electronArgs.dock = options.dock || false;
+  electronArgs.dock        = options.dock || false;
 
   attachToProcess(this);
 
@@ -97,11 +95,11 @@ function Driver(options = {}) {
   });
 
   //prepend adding child actions to the queue
-  Object.keys(Driver.childActions).forEach(function(key){
-    this.queue(function(done){
+  Object.keys(Driver.childActions).forEach((key) => {
+    this.queue((done) => {
       this.child.call('action', key, String(Driver.childActions[key]), done);
     });
-  }, this);
+  });
 }
 
 function handleExit(code, instance, cb){
@@ -153,12 +151,6 @@ function detachFromProcess(instance) {
   process.removeListener('SIGHUP',   instance._endNow);
   process.removeListener('SIGBREAK', instance._endNow);
 }
-
-/**
- * Child actions to create
- */
-
-Driver.childActions = {};
 
 /**
  * Go to a `url`
@@ -264,8 +256,7 @@ Driver.prototype.end = function(done) {
  * Queue
  */
 
-Driver.prototype.queue = function(...args) {
-  let fn = args.pop();
+Driver.prototype.queue = function(fn, ...args) {
   this._queue.push([fn, args]);
 };
 
@@ -284,6 +275,12 @@ Driver.prototype.then = function(fulfill, reject) {
   .then(fulfill, reject);
 };
 
+
+/**
+ * Child actions to create
+ */
+
+Driver.childActions = {};
 
 /**
  * Static: Support attaching custom actions

@@ -1,25 +1,6 @@
 import jsesc from 'jsesc';
 import fs from 'fs';
 
-/**
- * Click an element.
- *
- * @param {String} selector
- * @param {Function} done
- */
-
-export function click(selector, done){
-  this.evaluate_now(function (selector) {
-    document.activeElement.blur();
-    let element = document.querySelector(selector);
-    if (!element) {
-      throw new Error('Unable to find element by selector: ' + selector);
-    }
-    let event = document.createEvent('MouseEvent');
-    event.initEvent('click', true, true);
-    element.dispatchEvent(event);
-  }, done, selector);
-};
 
 /**
  * Helper functions for type() and insert() to focus/blur
@@ -208,23 +189,13 @@ export function viewport(width, height, done){
  * Take a screenshot.
  *
  * @param {String} path
- * @param {Object} clip
  * @param {Function} done
  */
 
-export function screenshot(path, clip, done){
-  if (typeof path === 'function') {
-    done = path;
-    clip = undefined;
-    path = undefined;
-  } else if (typeof clip === 'function') {
-    done = clip;
-    clip = (typeof path === 'string') ? undefined : path;
-    path = (typeof path === 'string') ? path : undefined;
-  }
-  this.child.call('screenshot', path, clip, function (error, img) {
+export function screenshot(path, done){
+  this.child.call('screenshot', path, undefined, (error, img) => {
     let buf = new Buffer(img.data);
-    path ? fs.writeFile(path, buf, done) : done(null, buf);
+    fs.writeFile(path, buf, done);
   });
 };
 
