@@ -1,4 +1,3 @@
-import jsesc from 'jsesc';
 import fs from 'fs';
 
 
@@ -110,7 +109,7 @@ function waitms (ms, done) {
 function waitelem (self, selector, done) {
   let elementPresent = new Function(`
     'use strict';
-    let element = document.querySelector('${jsesc(selector)}');
+    let element = document.querySelector('${JSON.stringify(selector).slice(1,-1)}');
     return (element ? true : false);
   `);
   waitfn.apply(this, [self, elementPresent, done]);

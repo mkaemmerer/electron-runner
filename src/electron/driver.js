@@ -177,6 +177,7 @@ Driver.prototype.run = function(fn) {
     let args = item[1] || [];
     let method = item[0];
     args.push(once(after));
+    //TODO: change calling convention so 'done' continuation comes first
     method.apply(self, args);
   }
 
