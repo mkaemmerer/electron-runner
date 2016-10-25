@@ -3,7 +3,6 @@ let default_electron_path = require('electron-prebuilt');
 import proc     from 'child_process';
 import path     from 'path';
 import once     from 'once';
-import split2   from 'split2';
 import defaults from 'defaults';
 import child    from './ipc';
 
@@ -64,14 +63,6 @@ function Driver(options = {}) {
     this.proc = proc.spawn(electron_path, [runner, JSON.stringify(electronArgs)], {
       stdio: [null, null, null, 'ipc'],
       env: defaults(options.env || {}, process.env)
-    });
-
-    this.proc.stdout.pipe(split2()).on('data', (data) => {
-      console.log(data);
-    });
-
-    this.proc.stderr.pipe(split2()).on('data', (data) => {
-      console.error(data);
     });
 
     this.proc.on('close', (code) => {
