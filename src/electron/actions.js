@@ -125,10 +125,10 @@ function waitelem (self, selector, done) {
  * @param {Function} done
  */
 
-function waitfn() { 
+function waitfn(...args) { 
   let timeout = this.timeout || null;
   let waitMsPassed = 0;
-  return tick.apply(this, arguments)
+  return tick(...args);
 
   function tick (...args /** self, fn, arg1, arg2..., done**/) {
     let [self, fn] = args;
