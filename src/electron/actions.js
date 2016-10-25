@@ -7,42 +7,34 @@ import fs from 'fs';
  */
 
 let focusSelector = function(done, selector) {
-  return this.evaluate_now(function(selector) {
+  return this.evaluate_now(done.bind(this), function(selector) {
     document.querySelector(selector).focus();
-  }, done.bind(this), selector);
+  }, selector);
 };
 
 let blurSelector = function(done, selector) {
-  return this.evaluate_now(function(selector) {
+  return this.evaluate_now(done.bind(this), function(selector) {
     document.querySelector(selector).blur();
-  }, done.bind(this), selector);
+  }, selector);
 };
 
 /**
  * Type into an element.
  *
+ * @param {Function} done
  * @param {String} selector
  * @param {String} text
- * @param {Function} done
  */
 
-export function type() {
-  let selector = arguments[0], text, done;
-  if(arguments.length == 2) {
-    done = arguments[1];
-  } else {
-    text = arguments[1];
-    done = arguments[2];
-  }
-
+export function type(done, selector, text) {
   let self = this;
 
   focusSelector.bind(this)(function() {
     let blurDone = blurSelector.bind(this, done, selector);
     if ((text || '') == '') {
-      this.evaluate_now(function(selector) {
+      this.evaluate_now(blurDone, function(selector) {
         document.querySelector(selector).value = '';
-      }, blurDone, selector);
+      }, selector);
     } else {
       self.child.call('type', text, blurDone);
     }
@@ -55,9 +47,8 @@ export function type() {
  * @param {...} args
  */
 
-export function wait(...args){
-  let done = args[args.length-1];
-  if (args.length < 2) {
+export function wait(done, ...args){
+  if (args.length === 0) {
     return done();
   }
 
@@ -149,7 +140,7 @@ function waitfn(...args) { 
         }, self.options.pollInterval);
       }
     };
-    let newArgs = [fn, waitDone].concat(args.slice(2,-1));
+    let newArgs = [waitDone, fn].concat(args.slice(2,-1));
     self.evaluate_now.apply(self, newArgs);
   }
 }
@@ -157,19 +148,16 @@ function waitfn(...args) { 
 /**
  * Execute a function on the page.
  *
+ * @param {Function} done
  * @param {Function} fn
  * @param {...} args
- * @param {Function} done
  */
 
-export function evaluate(...args /** fn, arg1, arg2..., done**/){
-  let [fn] = args;
-  let done = args[args.length-1];
-  let newArgs = [fn, done].concat(args.slice(1,-1));
+export function evaluate(done, fn, ...args){
   if (typeof fn !== 'function') {
     return done(new Error('.evaluate() fn should be a function'));
   }
-  this.evaluate_now.apply(this, newArgs);
+  this.evaluate_now(done, fn, ...args);
 };
 
 /**
@@ -180,18 +168,18 @@ export function evaluate(...args /** fn, arg1, arg2..., done**/){
  * @param {Function} done
  */
 
-export function viewport(width, height, done){
+export function viewport(done, width, height){
   this.child.call('size', width, height, done);
 };
 
 /**
  * Take a screenshot.
  *
- * @param {String} path
  * @param {Function} done
+ * @param {String} path
  */
 
-export function screenshot(path, done){
+export function screenshot(done, path){
   this.child.call('screenshot', path, undefined, (error, img) => {
     let buf = new Buffer(img.data);
     fs.writeFile(path, buf, done);
@@ -202,6 +190,6 @@ export function screenshot(path, done){
  * Authentication
  */
 
- export function authentication(login, password, done){
+ export function authentication(done, login, password){
    this.child.call('authentication', login, password, done);
  };

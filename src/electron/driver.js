@@ -176,8 +176,7 @@ Driver.prototype.run = function(fn) {
     if (err || !item) return done.apply(self, arguments);
     let args = item[1] || [];
     let method = item[0];
-    args.push(once(after));
-    //TODO: change calling convention so 'done' continuation comes first
+    args.unshift(once(after));
     method.apply(self, args);
   }
 
@@ -212,7 +211,7 @@ Driver.prototype.run = function(fn) {
  * normal API usage
  */
 
-Driver.prototype.evaluate_now = function(js_fn, done, ...args) {
+Driver.prototype.evaluate_now = function(done, js_fn, ...args) {
   let fn       = String(js_fn);
   let argsList = JSON.stringify(args).slice(1,-1);
 
