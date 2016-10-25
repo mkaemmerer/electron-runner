@@ -39,11 +39,9 @@ let template = require('./javascript');
  * @param {Object} options
  */
 
-function Nightmare(options) {
+function Nightmare(options = {}) {
   if (!(this instanceof Nightmare)) return new Nightmare(options);
-  options = options || {};
   let electronArgs = {};
-  let self = this;
 
   options.waitTimeout = options.waitTimeout || DEFAULT_WAIT_TIMEOUT;
   options.gotoTimeout = options.gotoTimeout || DEFAULT_GOTO_TIMEOUT;
@@ -69,17 +67,15 @@ function Nightmare(options) {
   attachToProcess(this);
 
   // initial state
-  this.state = 'initial';
+  this.state   = 'initial';
   this.running = false;
-  this.ending = false;
-  this.ended = false;
-  this._queue = [];
-  this._headers = {};
+  this.ending  = false;
+  this.ended   = false;
+  this._queue  = [];
   this.options = options;
 
   this.queue((done) => {
-
-    this.proc = proc.spawn(electron_path, [runner].concat(JSON.stringify(electronArgs)), {
+    this.proc = proc.spawn(electron_path, [runner, JSON.stringify(electronArgs)], {
       stdio: [null, null, null, 'ipc'],
       env: defaults(options.env || {}, process.env)
     });
@@ -93,43 +89,35 @@ function Nightmare(options) {
     });
 
     this.proc.on('close', (code) => {
-      if(!self.ended){
-        handleExit(code, self, noop);
+      if(!this.ended){
+        handleExit(code, this, noop);
       }
     });
 
     this.child = child(this.proc);
 
-    this.child.once('die', function(err){
-      self.die = err;
+    this.child.once('die', (err) => {
+      this.die = err;
     });
 
     // propagate console.log(...) through
-    this.child.on('log', function(...args) {
+    this.child.on('log', (...args) => {
       console.log(...args);
     });
 
-    this.child.on('uncaughtException', function(stack) {
+    this.child.on('uncaughtException', (stack) => {
       console.error('Nightmare runner error:\n\n%s\n', '\t' + stack.replace(/\n/g, '\n\t'));
-      endInstance(self, noop);
+      endInstance(this, noop);
       process.exit(1);
     });
 
-    this.child.once('ready', (versions) => {
-      this.engineVersions = versions;
-      this.child.call('browser-initialize', options, function() {
-        self.state = 'ready';
+    this.child.once('ready', () => {
+      this.child.call('browser-initialize', options, () => {
+        this.state = 'ready';
         done();
       });
     });
   });
-
-  // initialize namespaces
-  Nightmare.namespaces.forEach(function (name) {
-    if ('function' === typeof this[name]) {
-      this[name] = this[name]()
-    }
-  }, this)
 
   //prepend adding child actions to the queue
   Object.keys(Nightmare.childActions).forEach(function(key){
@@ -143,8 +131,8 @@ function handleExit(code, instance, cb){
   let help = {
     127: 'command not found - you may not have electron installed correctly',
     126: 'permission problem or command is not an executable - you may not have all the necessary dependencies for electron',
-    1: 'general error - you may need xvfb',
-    0: 'success!'
+    1:   'general error - you may need xvfb',
+    0:   'success!'
   };
 
   instance.proc.removeAllListeners();
@@ -158,7 +146,7 @@ function endInstance(instance, cb) {
     instance.proc.on('close', (code) => {
       handleExit(code, instance, cb);
     });
-    instance.child.call('quit', () =>{
+    instance.child.call('quit', () => {
       instance.child.removeAllListeners();
     });
   } else {
@@ -170,30 +158,24 @@ function endInstance(instance, cb) {
  * Attach any instance-specific process-level events.
  */
 function attachToProcess(instance) {
-  instance._endNow = endInstance.bind(null, instance, noop);
+  instance._endNow = () => endInstance(instance, noop);
   process.setMaxListeners(Infinity);
-  process.on('exit', instance._endNow);
-  process.on('SIGINT', instance._endNow);
-  process.on('SIGTERM', instance._endNow);
-  process.on('SIGQUIT', instance._endNow);
-  process.on('SIGHUP', instance._endNow);
+  process.on('exit',     instance._endNow);
+  process.on('SIGINT',   instance._endNow);
+  process.on('SIGTERM',  instance._endNow);
+  process.on('SIGQUIT',  instance._endNow);
+  process.on('SIGHUP',   instance._endNow);
   process.on('SIGBREAK', instance._endNow);
 }
 
 function detachFromProcess(instance) {
-  process.removeListener('exit', instance._endNow);
-  process.removeListener('SIGINT', instance._endNow);
-  process.removeListener('SIGTERM', instance._endNow);
-  process.removeListener('SIGQUIT', instance._endNow);
-  process.removeListener('SIGHUP', instance._endNow);
+  process.removeListener('exit',     instance._endNow);
+  process.removeListener('SIGINT',   instance._endNow);
+  process.removeListener('SIGTERM',  instance._endNow);
+  process.removeListener('SIGQUIT',  instance._endNow);
+  process.removeListener('SIGHUP',   instance._endNow);
   process.removeListener('SIGBREAK', instance._endNow);
 }
-
-/**
- * Namespaces to initialize
- */
-
-Nightmare.namespaces = [];
 
 /**
  * Child actions to create
@@ -202,33 +184,12 @@ Nightmare.namespaces = [];
 Nightmare.childActions = {};
 
 /**
- * Override headers for all HTTP requests
- */
-
-Nightmare.prototype.header = function(header, value) {
-  if (header && typeof value !== 'undefined') {
-    this._headers[header] = value;
-  } else {
-    this._headers = header || {};
-  }
-
-  return this;
-};
-
-/**
  * Go to a `url`
  */
 
-Nightmare.prototype.goto = function(url, headers) {
-  let self = this;
-
-  headers = headers || {};
-  for (let key in this._headers) {
-    headers[key] = headers[key] || this._headers[key];
-  }
-
-  this.queue(function(fn) {
-    self.child.call('goto', url, headers, this.options.gotoTimeout, fn);
+Nightmare.prototype.goto = function(url, headers = {}) {
+  this.queue((fn) => {
+    this.child.call('goto', url, headers, this.options.gotoTimeout, fn);
   });
   return this;
 };
@@ -238,7 +199,7 @@ Nightmare.prototype.goto = function(url, headers) {
  */
 
 Nightmare.prototype.run = function(fn) {
-  let steps = this.queue();
+  let steps = this._queue;
   this.running = true;
   this._queue = [];
   let self = this;
@@ -288,8 +249,7 @@ Nightmare.prototype.run = function(fn) {
  * normal API usage
  */
 
-Nightmare.prototype.evaluate_now = function(js_fn, done) {
-  let args = Array.prototype.slice.call(arguments).slice(2);
+Nightmare.prototype.evaluate_now = function(js_fn, done, ...args) {
   let argsList = JSON.stringify(args).slice(1,-1);
   let source = template.execute({ src: String(js_fn), args: argsList });
 
@@ -316,7 +276,6 @@ Nightmare.prototype.end = function(done) {
  */
 
 Nightmare.prototype.queue = function(...args) {
-  if (!arguments.length) return this._queue;
   let fn = args.pop();
   this._queue.push([fn, args]);
 };
@@ -327,10 +286,8 @@ Nightmare.prototype.queue = function(...args) {
  */
 
 Nightmare.prototype.then = function(fulfill, reject) {
-  let self = this;
-
-  return new Promise(function (success, failure) {
-    self.run(function(err, result) {
+  return new Promise((success, failure) => {
+    this.run(function(err, result) {
       if (err) failure(err);
       else success(result);
     })
@@ -356,10 +313,6 @@ Nightmare.action = function() {
     parentfn = arguments[2];
     childfn = arguments[1];
   }
-
-  // support functions and objects
-  // if it's an object, wrap it's
-  // properties in the queue function
 
   if(parentfn) {
     Nightmare.prototype[name] = function(...args){
