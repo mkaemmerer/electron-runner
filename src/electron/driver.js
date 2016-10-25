@@ -6,7 +6,6 @@ import once     from 'once';
 import split2   from 'split2';
 import defaults from 'defaults';
 import child    from './ipc';
-import template from './javascript';
 
 let noop = function() {};
 
@@ -237,8 +236,20 @@ Driver.prototype.run = function(fn) {
  */
 
 Driver.prototype.evaluate_now = function(js_fn, done, ...args) {
+  let fn       = String(js_fn);
   let argsList = JSON.stringify(args).slice(1,-1);
-  let source = template.execute({ src: String(js_fn), args: argsList });
+
+  let source = `
+  (function javascript () {
+    var ipc = __electron_runner.ipc;
+    try {
+      var response = (${fn})(${argsList});
+      ipc.send('response', response);
+    } catch (e) {
+      ipc.send('error', e.message);
+    }
+  })()
+  `;
 
   this.child.call('javascript', source, done);
   return this;

@@ -1,7 +1,3 @@
-/**
- * Module Dependencies
- */
-
 let minstache = require('minstache');
 
 /**
@@ -23,26 +19,7 @@ let execute = `
 `;
 
 /**
- * Inject the `src` on the client-side, capture
- * the response and logs, and send back via
- * ipc to electron's main process
- */
-
-let inject = `
-(function javascript () {
-  var ipc = __electron_runner.ipc;
-  try {
-    var response = (function () { {{!src}} \n})()
-    ipc.send('response', response);
-  } catch (e) {
-    ipc.send('error', e.message);
-  }
-})()
-`;
-
-/**
  * Export the templates
  */
 
 exports.execute = minstache.compile(execute);
-exports.inject = minstache.compile(inject);
