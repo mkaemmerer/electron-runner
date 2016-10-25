@@ -1,10 +1,8 @@
-const parent = require('./ipc')(process);
 const EventEmitter = require('events');
-const util = require('util');
+const util         = require('util');
 
 const RENDER_ELEMENT_ID = '__NIGHTMARE_RENDER__';
 
-module.exports = FrameManager;
 
 /**
  * FrameManager is an event emitter that produces a 'data' event each time the
@@ -13,35 +11,31 @@ module.exports = FrameManager;
  * window will produce an image that is up-to-date with the state of the page.
  */
 function FrameManager(window) {
-  if (!(this instanceof FrameManager)) return new FrameManager(window);
-
   EventEmitter.call(this);
-  let subscribed = false;
+  let subscribed     = false;
   let requestedFrame = false;
-  let self = this;
 
-  this.on('newListener', subscribe);
-  this.on('removeListener', unsubscribe);
-
-  function subscribe(eventName) {
+  let subscribe = (eventName) => {
     if (!subscribed && eventName === 'data') {
-      parent.emit('log', 'subscribing to browser window frames');
       window.webContents.beginFrameSubscription(receiveFrame);
     }
   }
 
-  function unsubscribe() {
-    if (!self.listenerCount('data')) {
-      parent.emit('log', 'unsubscribing from browser window frames')
+  let unsubscribe = () => {
+    if (!this.listenerCount('data')) {
       window.webContents.endFrameSubscription();
       subscribed = false;
     }
   }
 
-  function receiveFrame(buffer) {
+  let receiveFrame = (buffer) => {
     requestedFrame = false;
-    self.emit('data', buffer);
+    this.emit('data', buffer);
   }
+
+  this.on('newListener', subscribe);
+  this.on('removeListener', unsubscribe);
+
 
   /**
    * In addition to listening for events, calling `requestFrame` will ensure
@@ -54,10 +48,10 @@ function FrameManager(window) {
       this.once('data', callback);
     }
     if (!requestedFrame) {
-      parent.emit('log', 'altering page to force rendering');
       requestedFrame = true;
-      window.webContents.executeJavaScript(
-        '(' + triggerRender + ')("' + RENDER_ELEMENT_ID + '")');
+      window.webContents.executeJavaScript(`
+        (${triggerRender})("${RENDER_ELEMENT_ID}")
+      `);
     }
   };
 };
@@ -83,3 +77,8 @@ let triggerRender = (function (id) {
     document.documentElement.appendChild(renderElement);
   }
 }).toString();
+
+/* Export FrameManager */
+module.exports = function(window){
+  return new FrameManager(window);
+};

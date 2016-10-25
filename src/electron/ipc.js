@@ -17,9 +17,9 @@ function IPC(process) {
     return process[instance];
   }
 
-  let emitter = process[instance] = new Emitter();
-  let emit = emitter.emit;
-  let callId = 0;
+  let emitter    = process[instance] = new Emitter();
+  let emit       = emitter.emit;
+  let callId     = 0;
   let responders = {};
 
   // no parent

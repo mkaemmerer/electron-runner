@@ -1,13 +1,14 @@
 import * as actions from './actions';
 let default_electron_path = require('electron-prebuilt');
-let proc = require('child_process');
-let path = require('path');
-let child = require('./ipc');
-let once = require('once');
-let split2 = require('split2');
+let proc     = require('child_process');
+let path     = require('path');
+let once     = require('once');
+let split2   = require('split2');
 let defaults = require('defaults');
+let child    = require('./ipc');
+let template = require('./javascript');
+
 let noop = function() {};
-let keys = Object.keys;
 
 // Standard timeout for loading URLs
 const DEFAULT_GOTO_TIMEOUT = 30 * 1000;
@@ -27,11 +28,6 @@ const MAX_AUTH_RETRIES = 3;
 
 let runner = path.join(__dirname, 'runner.js');
 
-/**
- * Template
- */
-
-let template = require('./javascript');
 
 /**
  * Initialize `Nightmare`

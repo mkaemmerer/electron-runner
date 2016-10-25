@@ -1,14 +1,23 @@
-let parent        = require('./ipc')(process);
 let electron      = require('electron');
 let defaults      = require('deep-defaults');
-let join          = require('path').join;
+let path          = require('path');
 let BrowserWindow = electron.BrowserWindow;
 let renderer      = electron.ipcMain;
 let app           = electron.app;
 let fs            = require('fs');
 let urlFormat     = require('url');
+let parent        = require('./ipc')(process);
 let FrameManager  = require('./frame-manager');
 
+// Default Electron options
+const DEFAULT_OPTIONS = {
+  show: false,
+  alwaysOnTop: true,
+  webPreferences: {
+    preload: path.join(__dirname, 'preload.js'),
+    nodeIntegration: false
+  }
+};
 // URL protocols that don't need to be checked for validity
 const KNOWN_PROTOCOLS = ['http', 'https', 'file', 'about', 'javascript'];
 // Property for tracking whether a window is ready for interaction
@@ -18,7 +27,7 @@ const IS_READY = Symbol('isReady');
  * Handle uncaught exceptions in the main electron process
  */
 
-process.on('uncaughtException', function(e) {
+process.on('uncaughtException', (e) => {
   parent.emit('uncaughtException', e.stack)
 })
 
@@ -54,26 +63,21 @@ if (!processArgs.dock && app.dock) {
  * Listen for the app being "ready"
  */
 
-app.on('ready', function() {
+app.on('ready', () => {
   let win, frameManager, options, closed;
 
   /**
    * create a browser window
    */
 
-  parent.respondTo('browser-initialize', function(opts, done) {
+  parent.respondTo('browser-initialize', (opts = {}, done) => {
 
-    options = defaults(opts || {}, {
-      show: false,
-      alwaysOnTop: true,
-      webPreferences: {
-        preload: join(__dirname, 'preload.js'),
-        nodeIntegration: false
-      }
-    })
+    options = defaults(opts, DEFAULT_OPTIONS);
 
     /**
      * Create a new Browser Window
+     * Window Docs:
+     * https://github.com/atom/electron/blob/master/docs/api/browser-window.md
      */
 
     win = new BrowserWindow(options);
@@ -85,10 +89,6 @@ app.on('ready', function() {
       }
     }
 
-    /**
-     * Window Docs:
-     * https://github.com/atom/electron/blob/master/docs/api/browser-window.md
-     */
 
     frameManager = FrameManager(win);
 
@@ -102,12 +102,12 @@ app.on('ready', function() {
      * Pass along web content events
      */
 
-    renderer.on('page', function(sender, ...args/*, arguments, ... */) {
-      parent.emit.apply(parent, ['page'].concat(args));
+    renderer.on('page', (sender, ...args) => {
+      parent.emit('page', ...args);
     });
 
-    renderer.on('console', function(sender, type, args) {
-      parent.emit.apply(parent, ['console', type].concat(args));
+    renderer.on('console', (sender, type, ...args) => {
+      parent.emit('console', type, ...args);
     });
 
     win.webContents.on('did-finish-load',           forward('did-finish-load'));
@@ -125,16 +125,14 @@ app.on('ready', function() {
     win.webContents.on('crashed',                   forward('crashed'));
     win.webContents.on('plugin-crashed',            forward('plugin-crashed'));
     win.webContents.on('destroyed',                 forward('destroyed'));
-    win.webContents.on('close', (e) => {
-      closed = true;
-    });
+    win.webContents.on('close', (e) => { closed = true; });
 
     let loadwatch;
 
-    win.webContents.on('did-start-loading', function() {
+    win.webContents.on('did-start-loading', () => {
       if (win.webContents.isLoadingMainFrame()) {
         if(options.loadTimeout){
-          loadwatch = setTimeout(function(){
+          loadwatch = setTimeout(() => {
             win.webContents.stop();
           }, options.loadTimeout);
         }
@@ -142,7 +140,7 @@ app.on('ready', function() {
       }
     });
 
-    win.webContents.on('did-stop-loading', function(){
+    win.webContents.on('did-stop-loading', () => {
       clearTimeout(loadwatch);
       setIsReady(true);
     });
@@ -153,14 +151,10 @@ app.on('ready', function() {
   });
 
   /**
-   * Parent actions
-   */
-
-  /**
    * goto
    */
 
-  parent.respondTo('goto', function(url, headers, timeout, done) {
+  parent.respondTo('goto', (url, headers, timeout, done) => {
     if (!url || typeof url !== 'string') {
       return done('goto: `url` must be a non-empty string');
     }
@@ -184,7 +178,7 @@ app.on('ready', function() {
       let responseData = {};
       let domLoaded = false;
 
-      let timer = setTimeout(function() {
+      let timer = setTimeout(() => {
         // If the DOM loaded before timing out, consider the load successful.
         let error = domLoaded ? undefined : {
           message: 'navigation error',
@@ -253,9 +247,8 @@ app.on('ready', function() {
       function startLoading() {
         // abort any pending loads first
         if (win.webContents.isLoading()) {
-          parent.emit('log', 'aborting pending page load');
-          win.webContents.once('did-stop-loading', function() {
-            startLoading(true);
+          win.webContents.once('did-stop-loading', () => {
+            startLoading();
           });
           return win.webContents.stop();
         }
@@ -269,7 +262,7 @@ app.on('ready', function() {
 
         // javascript: URLs *may* trigger page loads; wait a bit to see
         if (protocol === 'javascript:') {
-          setTimeout(function() {
+          setTimeout(() => {
             if (!win.webContents.isLoadingMainFrame()) {
               done(null, {
                 url: url,
@@ -284,12 +277,8 @@ app.on('ready', function() {
       }
 
       let protocol = urlFormat.parse(url).protocol;
-      canLoadProtocol(protocol, function startLoad(canLoad) {
+      canLoadProtocol(protocol, (canLoad) => {
         if (canLoad) {
-          parent.emit('log',
-            `Navigating: "${url}",
-            headers: ${extraHeaders || '[none]'},
-            timeout: ${timeout}`);
           return startLoading();
         }
 
@@ -307,7 +296,7 @@ app.on('ready', function() {
    * javascript
    */
 
-  parent.respondTo('javascript', function(src, done) {
+  parent.respondTo('javascript', (src, done) => {
     let response = (event, response) => {
       renderer.removeListener('error', error);
       renderer.removeListener('log', log);
@@ -330,19 +319,10 @@ app.on('ready', function() {
   });
 
   /**
-   * css
-   */
-
-  parent.respondTo('css', function(css, done) {
-    win.webContents.insertCSS(css);
-    done();
-  });
-
-  /**
    * size
    */
 
-  parent.respondTo('size', function(width, height, done) {
+  parent.respondTo('size', (width, height, done) => {
     win.setSize(width, height);
     done();
   });
@@ -351,11 +331,11 @@ app.on('ready', function() {
    * type
    */
 
-  parent.respondTo('type', function (value, done) {
-    let chars = String(value).split('')
+  parent.respondTo('type', (value, done) => {
+    let chars = String(value).split('');
 
-    function type () {
-      let ch = chars.shift()
+    let type = () => {
+      let ch = chars.shift();
       if (ch === undefined) {
         return done();
       }
@@ -365,20 +345,17 @@ app.on('ready', function() {
         type: 'keyDown',
         keyCode: ch
       });
-
       // keypress
       win.webContents.sendInputEvent({
         type: 'char',
         keyCode: ch
       });
-
       // keyup
       win.webContents.sendInputEvent({
         type: 'keyUp',
         keyCode: ch
       });
 
-      // defer function into next event loop
       setTimeout(type, options.typeInterval);
     }
 
@@ -390,14 +367,14 @@ app.on('ready', function() {
    * screenshot
    */
 
-  parent.respondTo('screenshot', function(path, clip, done) {
+  parent.respondTo('screenshot', (path, clip, done) => {
     // https://gist.github.com/twolfson/0d374d9d7f26eefe7d38
-    let args = [function handleCapture (img) {
+    let args = [(img) => {
       done(null, img.toPng());
     }];
     if (clip) args.unshift(clip);
-    frameManager.requestFrame(function() {
-      win.capturePage.apply(win, args);
+    frameManager.requestFrame(() => {
+      win.capturePage(...args);
     });
   });
 
@@ -405,13 +382,13 @@ app.on('ready', function() {
    * Add custom functionality
    */
 
-  parent.respondTo('action', function(name, fntext, done){
-    let fn = new Function('with(this){ parent.emit("log", "adding action for '+ name +'"); return ' + fntext + '}')
+  parent.respondTo('action', (name, fntext, done) => {
+    let fn = new Function('with(this){ return ' + fntext + '}')
       .call({
         require: require,
         parent: parent
       });
-    fn(name, options, parent, win, renderer, function(error){
+    fn(name, options, parent, win, renderer, (error) => {
       done(error);
      });
   });
@@ -420,13 +397,11 @@ app.on('ready', function() {
    * Continue
    */
 
-  parent.respondTo('continue', function(done) {
+  parent.respondTo('continue', (done) => {
     if (isReady()) {
       done();
     } else {
-      parent.emit('log', 'waiting for window to load...');
-      win.once('did-change-is-ready', function() {
-        parent.emit('log', 'window became ready: ' + win.webContents.getURL());
+      win.once('did-change-is-ready', () => {
         done();
       });
     }
@@ -437,16 +412,15 @@ app.on('ready', function() {
    */
 
   let loginListener;
-  parent.respondTo('authentication', function(login, password, done) {
+  parent.respondTo('authentication', (login, password, done) => {
     let currentUrl;
     let tries = 0;
     if(loginListener){
       win.webContents.removeListener('login', loginListener);
     }
 
-    loginListener = function(webContents, request, authInfo, callback) {
+    loginListener = (webContents, request, authInfo, callback) => {
       tries++;
-      parent.emit('log', `authenticating against ${request.url}, try #${tries}`);
       if(currentUrl != request.url) {
         currentUrl = request.url;
         tries = 1;
@@ -467,7 +441,7 @@ app.on('ready', function() {
    * Kill the electron app
    */
 
-  parent.respondTo('quit', function(done) {
+  parent.respondTo('quit', (done) => {
     app.quit();
     done();
   });
@@ -476,10 +450,7 @@ app.on('ready', function() {
    * Send "ready" event to the parent process
    */
 
-  parent.emit('ready', {
-    electron: process.versions['electron'],
-    chrome: process.versions['chrome']
-  });
+  parent.emit('ready');
 
   /**
    * Check whether the window is ready for interaction
@@ -504,11 +475,11 @@ app.on('ready', function() {
    */
 
   function forward(name) {
-    return function (event, ...args) {
+    return (event, ...args) => {
       // NOTE: the raw Electron event used to be forwarded here, but we now send
       // an empty event in its place -- the raw event is not JSON serializable.
       if(!closed) {
-        parent.emit.apply(parent, [name, {}].concat(args));
+        parent.emit(name, {}, ...args);
       }
     };
   }
