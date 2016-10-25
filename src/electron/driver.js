@@ -93,13 +93,6 @@ function Driver(options = {}) {
       });
     });
   });
-
-  //prepend adding child actions to the queue
-  Object.keys(Driver.childActions).forEach((key) => {
-    this.queue((done) => {
-      this.child.call('action', key, String(Driver.childActions[key]), done);
-    });
-  });
 }
 
 function handleExit(code, instance, cb){
@@ -277,46 +270,26 @@ Driver.prototype.then = function(fulfill, reject) {
 
 
 /**
- * Child actions to create
- */
-
-Driver.childActions = {};
-
-/**
  * Static: Support attaching custom actions
  *
  * @param {String} name - method name
- * @param {Function|Object} [childfn] - Electron implementation
  * @param {Function|Object} parentfn - Driver implementation
  * @return {Driver}
  */
 
-Driver.action = function() {
-  let name = arguments[0], childfn, parentfn;
-  if(arguments.length === 2) {
-    parentfn = arguments[1];
-  } else {
-    parentfn = arguments[2];
-    childfn = arguments[1];
-  }
-
-  if(parentfn) {
-    Driver.prototype[name] = function(...args){
-      this._queue.push([parentfn, args]);
-      return this;
-    };
-  }
-
-  if(childfn) {
-    Driver.childActions[name] = childfn;
-  }
+Driver.action = function(name, parentfn) {
+  Driver.prototype[name] = function(...args){
+    this._queue.push([parentfn, args]);
+    return this;
+  };
+  return Driver;
 }
 
 /**
  * Attach all the actions.
  */
 
-Object.keys(actions).forEach(function (name) {
+Object.keys(actions).forEach((name) => {
   let fn = actions[name];
   Driver.action(name, fn);
 });
