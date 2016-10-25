@@ -15,6 +15,15 @@
     "babel-preset-stage-0": "^6.5.0"
   },
   "dependencies": {
-    "nightmare": "^2.7.0"
+    "deep-defaults": "^1.0.4",
+    "defaults": "^1.0.3",
+    "electron-prebuilt": "^1.4.4",
+    "jsesc": "^2.2.0",
+    "minstache": "^1.2.0",
+    "nightmare": "^2.7.0",
+    "once": "^1.4.0",
+    "sliced": "^1.0.1",
+    "split2": "^2.1.0",
+    "url": "^0.11.0"
   }
 }

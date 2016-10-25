@@ -1,4 +1,4 @@
-import Nightmare from 'nightmare';
+import Nightmare from './electron/nightmare';
 import Task from './task';
 
 const DEFAULT_OPTIONS = {
