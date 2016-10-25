@@ -2,7 +2,6 @@ import * as actions from './actions';
 let default_electron_path = require('electron-prebuilt');
 let proc = require('child_process');
 let path = require('path');
-let sliced = require('sliced');
 let child = require('./ipc');
 let once = require('once');
 let split2 = require('split2');
@@ -260,7 +259,7 @@ Nightmare.prototype.run = function(fn) {
 
   function after (err, res) {
     err = err || self.die;
-    let args = sliced(arguments);
+    let args = Array.prototype.slice.apply(arguments);
 
     if(self.child){
       self.child.call('continue', () => next.apply(self, args));
@@ -316,9 +315,8 @@ Nightmare.prototype.end = function(done) {
  * Queue
  */
 
-Nightmare.prototype.queue = function(done) {
+Nightmare.prototype.queue = function(...args) {
   if (!arguments.length) return this._queue;
-  let args = sliced(arguments);
   let fn = args.pop();
   this._queue.push([fn, args]);
 };

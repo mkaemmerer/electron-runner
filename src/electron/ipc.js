@@ -1,5 +1,4 @@
 let Emitter = require('events').EventEmitter;
-let sliced = require('sliced');
 
 
 /**
