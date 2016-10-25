@@ -1,7 +1,7 @@
 const EventEmitter = require('events');
 const util         = require('util');
 
-const RENDER_ELEMENT_ID = '__NIGHTMARE_RENDER__';
+const RENDER_ELEMENT_ID = '__ELECTRON_RUNNER_RENDER__';
 
 
 /**

@@ -1,12 +1,12 @@
 import * as actions from './actions';
 let default_electron_path = require('electron-prebuilt');
-let proc     = require('child_process');
-let path     = require('path');
-let once     = require('once');
-let split2   = require('split2');
-let defaults = require('defaults');
-let child    = require('./ipc');
-let template = require('./javascript');
+import proc     from 'child_process';
+import path     from 'path';
+import once     from 'once';
+import split2   from 'split2';
+import defaults from 'defaults';
+import child    from './ipc';
+import template from './javascript';
 
 let noop = function() {};
 
@@ -30,30 +30,21 @@ let runner = path.join(__dirname, 'runner.js');
 
 
 /**
- * Initialize `Nightmare`
+ * Initialize `Driver`
  *
  * @param {Object} options
  */
 
-function Nightmare(options = {}) {
-  if (!(this instanceof Nightmare)) return new Nightmare(options);
+function Driver(options = {}) {
   let electronArgs = {};
 
-  options.waitTimeout = options.waitTimeout || DEFAULT_WAIT_TIMEOUT;
-  options.gotoTimeout = options.gotoTimeout || DEFAULT_GOTO_TIMEOUT;
+  options.waitTimeout  = options.waitTimeout  || DEFAULT_WAIT_TIMEOUT;
+  options.gotoTimeout  = options.gotoTimeout  || DEFAULT_GOTO_TIMEOUT;
   options.pollInterval = options.pollInterval || DEFAULT_POLL_INTERVAL;
-
   options.typeInterval = options.typeInterval || DEFAULT_TYPE_INTERVAL;
 
-  let electron_path = options.electronPath || default_electron_path
+  let electron_path = options.electronPath || default_electron_path;
 
-  if (options.paths) {
-    electronArgs.paths = options.paths;
-  }
-
-  if (options.switches) {
-    electronArgs.switches = options.switches;
-  }
   options.maxAuthRetries = options.maxAuthRetries || MAX_AUTH_RETRIES;
 
   electronArgs.loadTimeout = options.loadTimeout;
@@ -102,7 +93,7 @@ function Nightmare(options = {}) {
     });
 
     this.child.on('uncaughtException', (stack) => {
-      console.error('Nightmare runner error:\n\n%s\n', '\t' + stack.replace(/\n/g, '\n\t'));
+      console.error('Driver runner error:\n\n%s\n', '\t' + stack.replace(/\n/g, '\n\t'));
       endInstance(this, noop);
       process.exit(1);
     });
@@ -116,9 +107,9 @@ function Nightmare(options = {}) {
   });
 
   //prepend adding child actions to the queue
-  Object.keys(Nightmare.childActions).forEach(function(key){
+  Object.keys(Driver.childActions).forEach(function(key){
     this.queue(function(done){
-      this.child.call('action', key, String(Nightmare.childActions[key]), done);
+      this.child.call('action', key, String(Driver.childActions[key]), done);
     });
   }, this);
 }
@@ -177,13 +168,13 @@ function detachFromProcess(instance) {
  * Child actions to create
  */
 
-Nightmare.childActions = {};
+Driver.childActions = {};
 
 /**
  * Go to a `url`
  */
 
-Nightmare.prototype.goto = function(url, headers = {}) {
+Driver.prototype.goto = function(url, headers = {}) {
   this.queue((fn) => {
     this.child.call('goto', url, headers, this.options.gotoTimeout, fn);
   });
@@ -194,7 +185,7 @@ Nightmare.prototype.goto = function(url, headers = {}) {
  * run
  */
 
-Nightmare.prototype.run = function(fn) {
+Driver.prototype.run = function(fn) {
   let steps = this._queue;
   this.running = true;
   this._queue = [];
@@ -245,7 +236,7 @@ Nightmare.prototype.run = function(fn) {
  * normal API usage
  */
 
-Nightmare.prototype.evaluate_now = function(js_fn, done, ...args) {
+Driver.prototype.evaluate_now = function(js_fn, done, ...args) {
   let argsList = JSON.stringify(args).slice(1,-1);
   let source = template.execute({ src: String(js_fn), args: argsList });
 
@@ -257,7 +248,7 @@ Nightmare.prototype.evaluate_now = function(js_fn, done, ...args) {
  * end
  */
 
-Nightmare.prototype.end = function(done) {
+Driver.prototype.end = function(done) {
   this.ending = true;
 
   if (done && !this.running && !this.ended) {
@@ -271,7 +262,7 @@ Nightmare.prototype.end = function(done) {
  * Queue
  */
 
-Nightmare.prototype.queue = function(...args) {
+Driver.prototype.queue = function(...args) {
   let fn = args.pop();
   this._queue.push([fn, args]);
 };
@@ -281,7 +272,7 @@ Nightmare.prototype.queue = function(...args) {
  * then
  */
 
-Nightmare.prototype.then = function(fulfill, reject) {
+Driver.prototype.then = function(fulfill, reject) {
   return new Promise((success, failure) => {
     this.run(function(err, result) {
       if (err) failure(err);
@@ -297,11 +288,11 @@ Nightmare.prototype.then = function(fulfill, reject) {
  *
  * @param {String} name - method name
  * @param {Function|Object} [childfn] - Electron implementation
- * @param {Function|Object} parentfn - Nightmare implementation
- * @return {Nightmare}
+ * @param {Function|Object} parentfn - Driver implementation
+ * @return {Driver}
  */
 
-Nightmare.action = function() {
+Driver.action = function() {
   let name = arguments[0], childfn, parentfn;
   if(arguments.length === 2) {
     parentfn = arguments[1];
@@ -311,14 +302,14 @@ Nightmare.action = function() {
   }
 
   if(parentfn) {
-    Nightmare.prototype[name] = function(...args){
+    Driver.prototype[name] = function(...args){
       this._queue.push([parentfn, args]);
       return this;
     };
   }
 
   if(childfn) {
-    Nightmare.childActions[name] = childfn;
+    Driver.childActions[name] = childfn;
   }
 }
 
@@ -328,11 +319,13 @@ Nightmare.action = function() {
 
 Object.keys(actions).forEach(function (name) {
   let fn = actions[name];
-  Nightmare.action(name, fn);
+  Driver.action(name, fn);
 });
 
 /**
- * Export `Nightmare`
+ * Export `Driver`
  */
 
-export default Nightmare;
+export default function(options){
+  return new Driver(options);
+}

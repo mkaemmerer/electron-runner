@@ -121,7 +121,7 @@ function waitms (ms, done) {
 /**
  * Wait for a specified selector to exist.
  *
- * @param {Nightmare} self
+ * @param {Driver} self
  * @param {String} selector
  * @param {Function} done
  */
@@ -138,7 +138,7 @@ function waitelem (self, selector, done) {
 /**
  * Wait until evaluated function returns true.
  *
- * @param {Nightmare} self
+ * @param {Driver} self
  * @param {Function} fn
  * @param {...} args
  * @param {Function} done

@@ -1,4 +1,4 @@
-import Nightmare from './electron/nightmare';
+import Driver from './electron/driver';
 import Task from './task';
 
 const DEFAULT_OPTIONS = {
@@ -24,7 +24,7 @@ let interpret = (program, browser) => {
 };
 
 let run = (program, options = DEFAULT_OPTIONS) => {
-  let browser = Nightmare(options);
+  let browser = Driver(options);
   let result  = interpret(program, browser);
 
   result

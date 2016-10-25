@@ -12,7 +12,7 @@ let minstache = require('minstache');
 
 let execute = `
 (function javascript () {
-  var ipc = __nightmare.ipc;
+  var ipc = __electron_runner.ipc;
   try {
     var response = ({{!src}})({{!args}})
     ipc.send('response', response);
@@ -30,7 +30,7 @@ let execute = `
 
 let inject = `
 (function javascript () {
-  var ipc = __nightmare.ipc;
+  var ipc = __electron_runner.ipc;
   try {
     var response = (function () { {{!src}} \n})()
     ipc.send('response', response);
