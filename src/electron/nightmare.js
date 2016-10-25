@@ -338,14 +338,6 @@ Nightmare.prototype.then = function(fulfill, reject) {
   .then(fulfill, reject);
 };
 
-// wrap all the functions in the queueing function
-function queued (name, fn) {
-  return function action () {
-    let args = [].slice.call(arguments);
-    this._queue.push([fn, args]);
-    return this;
-  }
-}
 
 /**
  * Static: Support attaching custom actions
@@ -370,7 +362,10 @@ Nightmare.action = function() {
   // properties in the queue function
 
   if(parentfn) {
-    Nightmare.prototype[name] = queued(name, parentfn);
+    Nightmare.prototype[name] = function(...args){
+      this._queue.push([parentfn, args]);
+      return this;
+    };
   }
 
   if(childfn) {
