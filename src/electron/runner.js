@@ -4,7 +4,6 @@ let path          = require('path');
 let BrowserWindow = electron.BrowserWindow;
 let renderer      = electron.ipcMain;
 let app           = electron.app;
-let fs            = require('fs');
 let urlFormat     = require('url');
 let parent        = require('./ipc')(process);
 let FrameManager  = require('./frame-manager');
