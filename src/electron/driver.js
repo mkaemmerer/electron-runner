@@ -1,29 +1,25 @@
 import * as actions from './actions';
 import proc     from 'child_process';
 import path     from 'path';
-import defaults from 'defaults';
+import defaults from 'deep-defaults';
 import child    from './ipc';
 import default_electron_path from 'electron-prebuilt';
 
-let noop = function() {};
 
-// Standard timeout for loading URLs
-const DEFAULT_GOTO_TIMEOUT = 30 * 1000;
-// Standard timeout for wait(ms)
-const DEFAULT_WAIT_TIMEOUT = 30 * 1000;
-// Timeout between keystrokes for `.type()`
-const DEFAULT_TYPE_INTERVAL = 100;
-// timeout between `wait` polls
-const DEFAULT_POLL_INTERVAL = 250;
-// max retry for authentication
-const MAX_AUTH_RETRIES = 3;
-
-
-/**
- * runner script
- */
-
-let runner = path.join(__dirname, 'runner.js');
+const DEFAULT_OPTIONS = {
+  //Timing
+  gotoTimeout:  30 * 1000,
+  waitTimeout:  30 * 1000,
+  typeInterval: 100,
+  pollInterval: 250,
+  //Retries
+  maxAuthRetries: 3,
+  //Electron
+  electronPath: default_electron_path,
+  electronArgs: {
+    dock: false
+  }
+};
 
 
 /**
@@ -33,20 +29,7 @@ let runner = path.join(__dirname, 'runner.js');
  */
 
 function Driver(options = {}) {
-  let electronArgs = {};
-
-  options.waitTimeout  = options.waitTimeout  || DEFAULT_WAIT_TIMEOUT;
-  options.gotoTimeout  = options.gotoTimeout  || DEFAULT_GOTO_TIMEOUT;
-  options.pollInterval = options.pollInterval || DEFAULT_POLL_INTERVAL;
-  options.typeInterval = options.typeInterval || DEFAULT_TYPE_INTERVAL;
-
-  let electron_path = options.electronPath || default_electron_path;
-
-  options.maxAuthRetries   = options.maxAuthRetries || MAX_AUTH_RETRIES;
-  electronArgs.loadTimeout = options.loadTimeout;
-  electronArgs.dock        = options.dock || false;
-
-  attachToProcess(this);
+  options = defaults(options, DEFAULT_OPTIONS);
 
   // initial state
   this.state   = 'initial';
@@ -56,8 +39,11 @@ function Driver(options = {}) {
   this._queue  = [];
   this.options = options;
 
+  attachToProcess(this);
+
   this.queue(() => {
-    this.proc = proc.spawn(electron_path, [runner, JSON.stringify(electronArgs)], {
+    let spawnArgs = [ path.join(__dirname, 'runner.js'), JSON.stringify(options.electronArgs) ];
+    this.proc = proc.spawn(options.electronPath, spawnArgs, {
       stdio: [null, null, null, 'ipc'],
       env: defaults(options.env || {}, process.env)
     });

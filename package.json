@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "deep-defaults": "^1.0.4",
-    "defaults": "^1.0.3",
     "electron-prebuilt": "^1.4.4",
     "url": "^0.11.0"
   }
