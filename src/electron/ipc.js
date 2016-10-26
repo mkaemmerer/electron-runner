@@ -1,16 +1,5 @@
 let Emitter = require('events').EventEmitter;
 
-
-/**
- * Export `IPC`
- */
-
-module.exports = IPC;
-
-/**
- * Initialize `IPC`
- */
-
 let instance = Symbol();
 function IPC(process) {
   if (process[instance]) {
@@ -39,37 +28,27 @@ function IPC(process) {
 
   /**
    * Call a responder function in the associated process. (In the process,
-   * responders can be registered with `ipc.respondTo()`.) The last argument
+   * responders can be registered with `ipc.respondTo()`.) The first argument
    * should be a callback function, which will called with the results of the
    * responder.
-   * This returns an event emitter. You can listen for the results of the
-   * responder using the `end` event (this is the same as passing a callback).
    * @param  {String} name Name of the responder function to call
-   * @param  {...Objects} [arguments] Any number of arguments to send
    * @param  {Function} [callback] A callback function that handles the results
-   * @return {Emitter}
+   * @param  {...Objects} [arguments] Any number of arguments to send
    */
   emitter.call = (name, callback, ...args) => {
     let id = callId++;
-    let progress = new Emitter();
 
     emitter.once(`CALL_RESULT_${id}`, (...args) => {
-      progress.emit('end', ...args);
-      progress.removeAllListeners();
-      progress = undefined;
-      if (callback) {
-        callback(...args);
-      }
+      callback(...args);
     });
 
     emitter.emit('CALL', id, name, ...args);
-    return progress;
   };
 
   /**
    * Register a responder to be called from other processes with `ipc.call()`.
    * The responder should be a function that accepts any number of arguments,
-   * where the last argument is a callback function. When the responder has
+   * where the first argument is a callback function. When the responder has
    * finished its work, it MUST call the callback. The first argument should be
    * an error, if any, and the second should be the results.
    * Only one responder can be registered for a given name.
@@ -87,7 +66,7 @@ function IPC(process) {
     };
 
     if (!responder) {
-      done(`Nothing responds to "${name}"`);
+      done(new Error(`Nothing responds to "${name}"`));
       return;
     }
 
@@ -100,3 +79,9 @@ function IPC(process) {
 
   return emitter;
 }
+
+/**
+ * Export `IPC`
+ */
+
+module.exports = IPC;
