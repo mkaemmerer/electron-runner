@@ -30,7 +30,7 @@ let run = (program, options = DEFAULT_OPTIONS) => {
   result
     .run(n => {
       console.log('END');
-      n.end().then(() => {});
+      n.end();
     });
 
   return result;

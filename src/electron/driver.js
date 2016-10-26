@@ -241,16 +241,11 @@ Driver.prototype.evaluate_now = function(js_fn, ...args) {
  * end
  */
 
-Driver.prototype.end = function(done) {
+Driver.prototype.end = function() {
   this.ending = true;
 
-  if (done && !this.running && !this.ended) {
-    this.run()
-      .then((res) => {
-        done(null, res);
-      }, (err) => {
-        done(err);
-      });
+  if (!this.running && !this.ended) {
+    this.run();
   }
 
   return this;
