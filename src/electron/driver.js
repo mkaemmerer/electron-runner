@@ -82,7 +82,7 @@ function Driver(options = {}) {
 
       this.child.on('uncaughtException', (stack) => {
         console.error('Driver runner error:\n\n%s\n', '\t' + stack.replace(/\n/g, '\n\t'));
-        endInstance(this, noop);
+        endInstance(this);
         process.exit(1);
       });
 
@@ -109,27 +109,30 @@ function handleExit(code, instance){
   instance.proc.removeAllListeners();
 };
 
-function endInstance(instance, cb) {
+function endInstance(instance) {
   instance.ended = true;
   detachFromProcess(instance);
-  if (instance.proc && instance.proc.connected) {
-    instance.proc.on('close', (code) => {
-      handleExit(code, instance);
-      cb();
-    });
-    instance.child.call('quit', () => {
-      instance.child.removeAllListeners();
-    });
-  } else {
-    cb();
-  }
+
+  return new Promise((resolve) => {
+    if (instance.proc && instance.proc.connected) {
+      instance.proc.on('close', (code) => {
+        handleExit(code, instance);
+        resolve();
+      });
+      instance.child.call('quit', () => {
+        instance.child.removeAllListeners();
+      });
+    } else {
+      resolve();
+    }
+  });
 }
 
 /**
  * Attach any instance-specific process-level events.
  */
 function attachToProcess(instance) {
-  instance._endNow = () => endInstance(instance, noop);
+  instance._endNow = () => endInstance(instance);
   process.setMaxListeners(Infinity);
   process.on('exit',     instance._endNow);
   process.on('SIGINT',   instance._endNow);
@@ -168,12 +171,8 @@ Driver.prototype.run = function() {
   this.running = true;
   this._queue = [];
 
-  let cont = () => {
-    if(this.child){
-      return this.child.call('continue');
-    }
-    return Promise.resolve();
-  }
+  let cont = () => this.child ? this.child.call('continue') : Promise.resolve();
+
   let step = (item) => {
     let [method, args] = item;
     return method.apply(this, args)
@@ -182,42 +181,33 @@ Driver.prototype.run = function() {
       );
   };
 
-  return new Promise((resolve, reject) => {
-    let fn = (err, res) => {
-      if(err){ reject(err); }
-      resolve(res);
-    };
+  let cleanup = () => {
+    this.running = false;
+    return this.ending ? endInstance(this) : Promise.resolve();
+  };
 
-    let done = (err, res) => {
-      this.running = false;
-      if (this.ending) {
-        endInstance(this, () => fn(err, res));
-      } else {
-        fn(err, res);
-      }
-    };
+  let next = (res) => {
+    let item = steps.shift();
 
-    let next = (err=this.die, res) => {
-      let item = steps.shift();
+    // Immediately halt execution if an error has been thrown, or we have no more queued up steps.
+    if(this.die){
+      return Promise.reject(this.die);
+    }
+    if (!item) {
+      return Promise.resolve(res);
+    }
 
-      // Immediately halt execution if an error has been thrown, or we have no more queued up steps.
-      if(err){
-        done(err);
-      }
-      if (!item) {
-        done(null, res);
-      }
+    return step(item).then(next);
+  };
 
-      step(item)
-        .then((result) => {
-          next(err, result);
-        }, (err) => {
-          next(err);
-        });
-    };
-    // kick us off
-    next();
-  });
+  return next()
+    .then((res) => {
+      return cleanup()
+        .then(() => Promise.resolve(res));
+    }, (err) => {
+      return cleanup()
+        .then(() => Promise.reject(err));
+    });
 };
 
 /**
@@ -256,7 +246,11 @@ Driver.prototype.end = function(done) {
 
   if (done && !this.running && !this.ended) {
     this.run()
-      .then((res) => done(null, res), (err) => done(err));
+      .then((res) => {
+        done(null, res)
+      }, (err) => {
+        done(err)
+      });
   }
 
   return this;
