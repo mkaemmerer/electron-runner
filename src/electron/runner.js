@@ -60,8 +60,9 @@ if (!processArgs.dock && app.dock) {
 
 
 /**
- * Normalize Headers
+ * Utility Functions
  */
+// Format headers object for call to loadURL
 function toLoadURLOptions(headers){
   let httpReferrer = '';
   let extraHeaders = '';
@@ -79,6 +80,17 @@ function toLoadURLOptions(headers){
   }
   return loadUrlOptions;
 }
+// In most environments, loadURL handles this logic for us, but in some
+// it just hangs for unhandled protocols. Mitigate by checking ourselves.
+function canLoadProtocol(protocol, callback) {
+  protocol = (protocol || '').replace(/:$/, '');
+  if (!protocol || KNOWN_PROTOCOLS.includes(protocol)) {
+    callback(true);
+  } else {
+    electron.protocol.isProtocolHandled(protocol, callback);
+  }
+}
+
 
 /**
  * Listen for the app being "ready"
@@ -149,7 +161,6 @@ app.on('ready', () => {
     win.webContents.on('close', (e) => { closed = true; });
 
     let loadwatch;
-
     win.webContents.on('did-start-loading', () => {
       if (win.webContents.isLoadingMainFrame()) {
         if(options.loadTimeout){
@@ -160,7 +171,6 @@ app.on('ready', () => {
         setIsReady(false);
       }
     });
-
     win.webContents.on('did-stop-loading', () => {
       clearTimeout(loadwatch);
       setIsReady(true);
@@ -211,8 +221,7 @@ app.on('ready', () => {
         }
       }
 
-      function handleDetails(
-        event, status, newUrl, oldUrl, statusCode, method, referrer, headers, resourceType) {
+      function handleDetails(event, status, newUrl, oldUrl, statusCode, method, referrer, headers, resourceType) {
         if (resourceType === 'mainFrame') {
           responseData = {
             url: newUrl,
@@ -241,16 +250,6 @@ app.on('ready', () => {
         setIsReady(true);
         // wait a tick before notifying to resolve race conditions for events
         setImmediate(() => done(error, data));
-      }
-
-      // In most environments, loadURL handles this logic for us, but in some
-      // it just hangs for unhandled protocols. Mitigate by checking ourselves.
-      function canLoadProtocol(protocol, callback) {
-        protocol = (protocol || '').replace(/:$/, '');
-        if (!protocol || KNOWN_PROTOCOLS.includes(protocol)) {
-          return callback(true);
-        }
-        electron.protocol.isProtocolHandled(protocol, callback);
       }
 
       function startLoading() {
