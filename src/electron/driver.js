@@ -163,48 +163,61 @@ Driver.prototype.goto = function(url, headers = {}) {
  * run
  */
 
-Driver.prototype.run = function(fn) {
+Driver.prototype.run = function() {
   let steps = this._queue;
   this.running = true;
   this._queue = [];
 
-  let done = (err, res) => {
-    this.running = false;
-    if (this.ending) {
-      endInstance(this, () => fn(err, res));
-    } else {
-      fn(err, res);
-    }
-  };
-
-  let next = (err, res) => {
-    let item = steps.shift();
-    // Immediately halt execution if an error has been thrown, or we have no more queued up steps.
-    if (err || !item) {
-      done(err, res);
-    }
-    let [method, args] = item;
-    method.apply(this, args)
-      .then((result) => {
-        after(null, result);
-      }, (err) => {
-        after(err);
-      });
-  };
-
-  let after = (err=this.die, res) => {
+  let cont = () => {
     if(this.child){
-      this.child.call('continue')
-        .then(() => next(err, res));
-    } else {
-      next(err, res);
+      return this.child.call('continue');
     }
+    return Promise.resolve();
+  }
+  let step = (item) => {
+    let [method, args] = item;
+    return method.apply(this, args)
+      .then((res) =>
+        cont().then(() => Promise.resolve(res))
+      );
   };
 
-  // kick us off
-  next();
+  return new Promise((resolve, reject) => {
+    let fn = (err, res) => {
+      if(err){ reject(err); }
+      resolve(res);
+    };
 
-  return this;
+    let done = (err, res) => {
+      this.running = false;
+      if (this.ending) {
+        endInstance(this, () => fn(err, res));
+      } else {
+        fn(err, res);
+      }
+    };
+
+    let next = (err=this.die, res) => {
+      let item = steps.shift();
+
+      // Immediately halt execution if an error has been thrown, or we have no more queued up steps.
+      if(err){
+        done(err);
+      }
+      if (!item) {
+        done(null, res);
+      }
+
+      step(item)
+        .then((result) => {
+          next(err, result);
+        }, (err) => {
+          next(err);
+        });
+    };
+    // kick us off
+    next();
+  });
 };
 
 /**
@@ -242,7 +255,8 @@ Driver.prototype.end = function(done) {
   this.ending = true;
 
   if (done && !this.running && !this.ended) {
-    this.run(done);
+    this.run()
+      .then((res) => done(null, res), (err) => done(err));
   }
 
   return this;
@@ -262,13 +276,8 @@ Driver.prototype.queue = function(fn, ...args) {
  */
 
 Driver.prototype.then = function(fulfill, reject) {
-  return new Promise((success, failure) => {
-    this.run(function(err, result) {
-      if (err) failure(err);
-      else success(result);
-    })
-  })
-  .then(fulfill, reject);
+  return this.run()
+    .then(fulfill, reject);
 };
 
 
