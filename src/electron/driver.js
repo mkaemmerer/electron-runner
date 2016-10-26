@@ -65,7 +65,7 @@ function Driver(options = {}) {
     return new Promise((resolve) => {
       this.proc.on('close', (code) => {
         if(!this.ended){
-          handleExit(code, this, noop);
+          handleExit(code, this);
         }
       });
 
@@ -98,16 +98,15 @@ function Driver(options = {}) {
   });
 }
 
-function handleExit(code, instance, cb){
+function handleExit(code, instance){
   let help = {
     127: 'command not found - you may not have electron installed correctly',
     126: 'permission problem or command is not an executable - you may not have all the necessary dependencies for electron',
     1:   'general error - you may need xvfb',
     0:   'success!'
   };
-
+  console.log(help[code]);
   instance.proc.removeAllListeners();
-  cb();
 };
 
 function endInstance(instance, cb) {
@@ -115,7 +114,8 @@ function endInstance(instance, cb) {
   detachFromProcess(instance);
   if (instance.proc && instance.proc.connected) {
     instance.proc.on('close', (code) => {
-      handleExit(code, instance, cb);
+      handleExit(code, instance);
+      cb();
     });
     instance.child.call('quit', () => {
       instance.child.removeAllListeners();

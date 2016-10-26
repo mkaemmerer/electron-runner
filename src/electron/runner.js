@@ -460,7 +460,6 @@ app.on('ready', () => {
    * Set whether the window is ready for interaction
    */
   function setIsReady(ready) {
-    ready = !!ready;
     if (ready !== win[IS_READY]) {
       win[IS_READY] = ready;
       win.emit('did-change-is-ready', ready);
