@@ -70,7 +70,7 @@ app.on('ready', () => {
    * create a browser window
    */
 
-  parent.respondTo('browser-initialize', (opts = {}, done) => {
+  parent.respondTo('browser-initialize', (done, opts = {}) => {
 
     options = defaults(opts, DEFAULT_OPTIONS);
 
@@ -154,7 +154,7 @@ app.on('ready', () => {
    * goto
    */
 
-  parent.respondTo('goto', (url, headers, timeout, done) => {
+  parent.respondTo('goto', (done, url, headers, timeout) => {
     if (!url || typeof url !== 'string') {
       return done('goto: `url` must be a non-empty string');
     }
@@ -296,7 +296,7 @@ app.on('ready', () => {
    * javascript
    */
 
-  parent.respondTo('javascript', (src, done) => {
+  parent.respondTo('javascript', (done, src) => {
     let response = (event, response) => {
       renderer.removeListener('error', error);
       renderer.removeListener('log', log);
@@ -322,7 +322,7 @@ app.on('ready', () => {
    * size
    */
 
-  parent.respondTo('size', (width, height, done) => {
+  parent.respondTo('size', (done, width, height) => {
     win.setSize(width, height);
     done();
   });
@@ -331,7 +331,7 @@ app.on('ready', () => {
    * type
    */
 
-  parent.respondTo('type', (value, done) => {
+  parent.respondTo('type', (done, value) => {
     let chars = String(value).split('');
 
     let type = () => {
@@ -367,14 +367,12 @@ app.on('ready', () => {
    * screenshot
    */
 
-  parent.respondTo('screenshot', (path, clip, done) => {
+  parent.respondTo('screenshot', (done) => {
     // https://gist.github.com/twolfson/0d374d9d7f26eefe7d38
-    let args = [(img) => {
-      done(null, img.toPng());
-    }];
-    if (clip) args.unshift(clip);
     frameManager.requestFrame(() => {
-      win.capturePage(...args);
+      win.capturePage((img) => {
+        done(null, img.toPng());
+      });
     });
   });
 
@@ -382,7 +380,7 @@ app.on('ready', () => {
    * Add custom functionality
    */
 
-  parent.respondTo('action', (name, fntext, done) => {
+  parent.respondTo('action', (done, name, fntext) => {
     let fn = new Function('with(this){ return ' + fntext + '}')
       .call({
         require: require,
@@ -412,7 +410,7 @@ app.on('ready', () => {
    */
 
   let loginListener;
-  parent.respondTo('authentication', (login, password, done) => {
+  parent.respondTo('authentication', (done, login, password) => {
     let currentUrl;
     let tries = 0;
     if(loginListener){

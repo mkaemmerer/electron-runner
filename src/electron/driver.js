@@ -87,10 +87,10 @@ function Driver(options = {}) {
     });
 
     this.child.once('ready', () => {
-      this.child.call('browser-initialize', options, () => {
+      this.child.call('browser-initialize', () => {
         this.state = 'ready';
         done();
-      });
+      }, options);
     });
   });
 }
@@ -150,8 +150,8 @@ function detachFromProcess(instance) {
  */
 
 Driver.prototype.goto = function(url, headers = {}) {
-  this.queue((fn) => {
-    this.child.call('goto', url, headers, this.options.gotoTimeout, fn);
+  this.queue((done) => {
+    this.child.call('goto', done, url, headers, this.options.gotoTimeout);
   });
   return this;
 };
@@ -227,7 +227,7 @@ Driver.prototype.evaluate_now = function(done, js_fn, ...args) {
   })()
   `;
 
-  this.child.call('javascript', source, done);
+  this.child.call('javascript', done, source);
   return this;
 };
 

@@ -36,7 +36,7 @@ export function type(done, selector, text) {
         document.querySelector(selector).value = '';
       }, selector);
     } else {
-      self.child.call('type', text, blurDone);
+      self.child.call('type', blurDone, text);
     }
   }, selector);
 };
@@ -155,7 +155,7 @@ export function evaluate(done, fn, ...args){
  */
 
 export function viewport(done, width, height){
-  this.child.call('size', width, height, done);
+  this.child.call('size', done, width, height);
 };
 
 /**
@@ -166,7 +166,7 @@ export function viewport(done, width, height){
  */
 
 export function screenshot(done, path){
-  this.child.call('screenshot', path, undefined, (error, img) => {
+  this.child.call('screenshot', (error, img) => {
     let buf = new Buffer(img.data);
     fs.writeFile(path, buf, done);
   });
@@ -177,5 +177,5 @@ export function screenshot(done, path){
  */
 
  export function authentication(done, login, password){
-   this.child.call('authentication', login, password, done);
+   this.child.call('authentication', done, login, password);
  };

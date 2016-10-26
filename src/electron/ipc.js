@@ -49,13 +49,7 @@ function IPC(process) {
    * @param  {Function} [callback] A callback function that handles the results
    * @return {Emitter}
    */
-  emitter.call = (name, ...args) => {
-    let callback = args.pop();
-    if (typeof callback !== 'function') {
-      args.push(callback);
-      callback = undefined;
-    }
-
+  emitter.call = (name, callback, ...args) => {
     let id = callId++;
     let progress = new Emitter();
 
@@ -98,7 +92,7 @@ function IPC(process) {
     }
 
     try {
-      responder(...args, done);
+      responder(done, ...args);
     } catch (error) {
       done(error);
     }
