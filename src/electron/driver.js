@@ -62,30 +62,30 @@ function Driver(options = {}) {
       env: defaults(options.env || {}, process.env)
     });
 
+    this.child = child(this.proc);
+
+    this.child.once('die', (err) => {
+      this.die = err;
+    });
+
+    // propagate console.log(...) through
+    this.child.on('log', (...args) => {
+      console.log(...args);
+    });
+
+    this.child.on('uncaughtException', (stack) => {
+      console.error('Driver runner error:\n\n%s\n', '\t' + stack.replace(/\n/g, '\n\t'));
+      endInstance(this);
+      process.exit(1);
+    });
+
+    this.proc.on('close', (code) => {
+      if(!this.ended){
+        handleExit(code, this);
+      }
+    });
+
     return new Promise((resolve) => {
-      this.proc.on('close', (code) => {
-        if(!this.ended){
-          handleExit(code, this);
-        }
-      });
-
-      this.child = child(this.proc);
-
-      this.child.once('die', (err) => {
-        this.die = err;
-      });
-
-      // propagate console.log(...) through
-      this.child.on('log', (...args) => {
-        console.log(...args);
-      });
-
-      this.child.on('uncaughtException', (stack) => {
-        console.error('Driver runner error:\n\n%s\n', '\t' + stack.replace(/\n/g, '\n\t'));
-        endInstance(this);
-        process.exit(1);
-      });
-
       this.child.once('ready', () => {
         this.child.call('browser-initialize', options)
           .then(() => {
@@ -247,9 +247,9 @@ Driver.prototype.end = function(done) {
   if (done && !this.running && !this.ended) {
     this.run()
       .then((res) => {
-        done(null, res)
+        done(null, res);
       }, (err) => {
-        done(err)
+        done(err);
       });
   }
 
