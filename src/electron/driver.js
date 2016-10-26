@@ -87,10 +87,11 @@ function Driver(options = {}) {
     });
 
     this.child.once('ready', () => {
-      this.child.call('browser-initialize', () => {
-        this.state = 'ready';
-        done();
-      }, options);
+      this.child.call('browser-initialize', options)
+        .then(() => {
+          this.state = 'ready';
+          done();
+        });
     });
   });
 }
@@ -151,7 +152,8 @@ function detachFromProcess(instance) {
 
 Driver.prototype.goto = function(url, headers = {}) {
   this.queue((done) => {
-    this.child.call('goto', done, url, headers, this.options.gotoTimeout);
+    this.child.call('goto', url, headers, this.options.gotoTimeout)
+      .then(() => done(), (err) => done(err));
   });
   return this;
 };
@@ -185,7 +187,8 @@ Driver.prototype.run = function(fn) {
     let args = Array.prototype.slice.apply(arguments);
 
     if(self.child){
-      self.child.call('continue', () => next.apply(self, args));
+      self.child.call('continue')
+        .then(() => next.apply(self, args));
     } else {
       next.apply(self, args);
     }
@@ -227,7 +230,8 @@ Driver.prototype.evaluate_now = function(done, js_fn, ...args) {
   })()
   `;
 
-  this.child.call('javascript', done, source);
+  this.child.call('javascript', source)
+    .then((result) => done(null, result), (err) => done(err));
   return this;
 };
 

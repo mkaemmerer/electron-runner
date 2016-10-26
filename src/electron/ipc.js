@@ -28,21 +28,21 @@ function IPC(process) {
 
   /**
    * Call a responder function in the associated process. (In the process,
-   * responders can be registered with `ipc.respondTo()`.) The first argument
-   * should be a callback function, which will called with the results of the
-   * responder.
+   * responders can be registered with `ipc.respondTo()`.)
    * @param  {String} name Name of the responder function to call
-   * @param  {Function} [callback] A callback function that handles the results
    * @param  {...Objects} [arguments] Any number of arguments to send
+   * @return {Promise}
    */
-  emitter.call = (name, callback, ...args) => {
+  emitter.call = (name, ...args) => {
     let id = callId++;
 
-    emitter.once(`CALL_RESULT_${id}`, (...args) => {
-      callback(...args);
+    let result = new Promise((resolve, reject) => {
+      emitter.once(`CALL_RESULT_${id}`, resolve);
+      emitter.once(`CALL_ERROR_${id}`,  reject);
     });
-
     emitter.emit('CALL', id, name, ...args);
+
+    return result;
   };
 
   /**
@@ -61,19 +61,23 @@ function IPC(process) {
 
   emitter.on('CALL', (id, name, ...args) => {
     let responder = responders[name];
-    let done = (...args) => {
-      emitter.emit(`CALL_RESULT_${id}`, ...args);
-    };
 
     if (!responder) {
-      done(new Error(`Nothing responds to "${name}"`));
+      let err = new Error(`Nothing responds to "${name}"`);
+      emitter.emit(`CALL_ERROR_${id}`, err);
       return;
     }
 
     try {
-      responder(done, ...args);
+      responder((err, result) => {
+        if(err){
+          emitter.emit(`CALL_ERROR_${id}`, err);
+        } else {
+          emitter.emit(`CALL_RESULT_${id}`, result);
+        }
+      }, ...args);
     } catch (error) {
-      done(error);
+      emitter.emit(`CALL_ERROR_${id}`, error);
     }
   });
 

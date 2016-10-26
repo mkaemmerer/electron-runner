@@ -156,7 +156,7 @@ app.on('ready', () => {
 
   parent.respondTo('goto', (done, url, headers, timeout) => {
     if (!url || typeof url !== 'string') {
-      return done('goto: `url` must be a non-empty string');
+      return done(new Error('goto: `url` must be a non-empty string'));
     }
 
     let httpReferrer = '';

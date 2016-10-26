@@ -31,12 +31,13 @@ export function type(done, selector, text) {
 
   focusSelector.bind(this)(function() {
     let blurDone = blurSelector.bind(this, done, selector);
-    if ((text || '') == '') {
+    if (text == '') {
       this.evaluate_now(blurDone, function(selector) {
         document.querySelector(selector).value = '';
       }, selector);
     } else {
-      self.child.call('type', blurDone, text);
+      self.child.call('type', text)
+        .then((result) => blurDone(null, result), (err) => blurDone(err));
     }
   }, selector);
 };
@@ -149,13 +150,14 @@ export function evaluate(done, fn, ...args){
 /**
  * Set the viewport.
  *
+ * @param {Function} done
  * @param {Number} width
  * @param {Number} height
- * @param {Function} done
  */
 
 export function viewport(done, width, height){
-  this.child.call('size', done, width, height);
+  this.child.call('size', width, height)
+    .then(() => done(), (err) => done(err));
 };
 
 /**
@@ -166,16 +168,22 @@ export function viewport(done, width, height){
  */
 
 export function screenshot(done, path){
-  this.child.call('screenshot', (error, img) => {
-    let buf = new Buffer(img.data);
-    fs.writeFile(path, buf, done);
-  });
+  this.child.call('screenshot')
+    .then((img) => {
+      let buf = new Buffer(img.data);
+      fs.writeFile(path, buf, done);
+    }, (err) => done(err));
 };
 
 /**
  * Authentication
+ *
+ * @param {Function} done
+ * @param {String} login
+ * @param {String} password
  */
 
  export function authentication(done, login, password){
-   this.child.call('authentication', done, login, password);
+   this.child.call('authentication', login, password)
+    .then(() => done(), (err) => done(err));
  };
