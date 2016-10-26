@@ -171,9 +171,9 @@ Driver.prototype.run = function(fn) {
   let done = (err, res) => {
     this.running = false;
     if (this.ending) {
-      endInstance(this, () => fn.apply(this, err, res));
+      endInstance(this, () => fn(err, res));
     } else {
-      fn.apply(this, err, res);
+      fn(err, res);
     }
   };
 
@@ -181,14 +181,14 @@ Driver.prototype.run = function(fn) {
     let item = steps.shift();
     // Immediately halt execution if an error has been thrown, or we have no more queued up steps.
     if (err || !item) {
-      done.apply(this, err, res);
+      done(err, res);
     }
     let [method, args] = item;
     method.apply(this, args)
       .then((result) => {
         after(null, result);
       }, (err) => {
-        after(err)
+        after(err);
       });
   };
 
