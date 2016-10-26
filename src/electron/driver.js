@@ -166,42 +166,38 @@ Driver.prototype.run = function(fn) {
   let steps = this._queue;
   this.running = true;
   this._queue = [];
-  let self = this;
+
+  let done = (err, res) => {
+    this.running = false;
+    if (this.ending) {
+      endInstance(this, () => fn.apply(this, err, res));
+    } else {
+      fn.apply(this, err, res);
+    }
+  };
+
+  let next = (err, res) => {
+    let item = steps.shift();
+    // Immediately halt execution if an error has been thrown, or we have no more queued up steps.
+    if (err || !item) {
+      done.apply(this, err, res);
+    }
+    let [method, args] = item;
+    args.unshift(once(after));
+    method.apply(this, args);
+  };
+
+  let after = (err=this.die, res) => {
+    if(this.child){
+      this.child.call('continue')
+        .then(() => next(err, res));
+    } else {
+      next(err, res);
+    }
+  };
 
   // kick us off
   next();
-
-  // next function
-  function next (err, res) {
-    let item = steps.shift();
-    // Immediately halt execution if an error has been thrown, or we have no more queued up steps.
-    if (err || !item) return done.apply(self, arguments);
-    let args = item[1] || [];
-    let method = item[0];
-    args.unshift(once(after));
-    method.apply(self, args);
-  }
-
-  function after (err, res) {
-    err = err || self.die;
-    let args = Array.prototype.slice.apply(arguments);
-
-    if(self.child){
-      self.child.call('continue')
-        .then(() => next.apply(self, args));
-    } else {
-      next.apply(self, args);
-    }
-  }
-
-  function done () {
-    let doneargs = arguments;
-    self.running = false;
-    if (self.ending) {
-      return endInstance(self, () => fn.apply(self, doneargs));
-    }
-    return fn.apply(self, doneargs);
-  }
 
   return this;
 };
