@@ -2,7 +2,7 @@ import fs from 'fs';
 
 
 /**
- * Helper functions for type() and insert() to focus/blur
+ * Helper functions for type() to focus/blur
  * so that we trigger DOM events.
  */
 
@@ -48,100 +48,81 @@ export function type(selector, text) {
  */
 
 export function wait(condition, ...args){
-  return new Promise((resolve, reject) => {
-    let done = (err, res) => {
-      if(err){ reject(err); }
-      resolve(res);
-    };
+  if (typeof condition === 'number') {
+    if(condition < this.options.waitTimeout){
+      return waitms(this, condition);
+    } else {
+      return waitms(this, this.options.waitTimeout)
+        .then(() => {
+          let error = new Error('.wait() timed out after '+this.options.waitTimeout+'msec');
+          return Promise.reject(error);
+        });
+    }
+  }
+  if (typeof condition === 'string') {
+    return waitelem(this, condition);
+  }
+  if (typeof condition === 'function') {
+    return waitfn(this, condition, ...args);
+  }
 
-    if (condition === undefined) {
-      done();
-      return;
-    }
-
-    if (typeof condition === 'number') {
-      if(condition < this.options.waitTimeout){
-        waitms(this, done, condition);
-      } else {
-        waitms(this, () => {
-          done(new Error('.wait() timed out after '+this.options.waitTimeout+'msec'));
-        }, this.options.waitTimeout);
-      }
-    }
-    else if (typeof condition === 'string') {
-      waitelem(this, done, condition);
-    }
-    else if (typeof condition === 'function') {
-      waitfn(this, done, condition, ...args);
-    }
-    else {
-      done();
-    }
-  });
+  return Promise.resolve();
 };
 
 /**
  * Wait for a specififed amount of time.
  *
  * @param {Driver} self
- * @param {Function} done
  * @param {Number} ms
  */
 
-function waitms (self, done, ms) {
-  setTimeout(done, ms);
+function waitms (self, ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 /**
  * Wait for a specified selector to exist.
  *
  * @param {Driver} self
- * @param {Function} done
  * @param {String} selector
  */
 
-function waitelem (self, done, selector) {
+function waitelem (self, selector) {
   let elementPresent = function(selector){
     return (document.querySelector(selector) ? true : false);
   };
-  waitfn(self, done, elementPresent, selector);
+  return waitfn(self, elementPresent, selector);
 }
 
 /**
  * Wait until evaluated function returns true.
  *
  * @param {Driver} self
- * @param {Function} done
  * @param {Function} fn
  * @param {...} args
  */
 
-function waitfn(self, done, fn, ...args) { 
+function waitfn(self, fn, ...args) { 
   let waitMsPassed = 0;
-  return tick(self, done, fn, ...args);
 
-  function tick (self, done, fn, ...args) {
-    let waitDone = function (err, result) {
-      if (result) {
-        done();
-      }
-      else if (self.options.waitTimeout && waitMsPassed > self.options.waitTimeout) {
-        done(new Error('.wait() timed out after '+self.options.waitTimeout+'msec'));
-      }
-      else {
-        waitMsPassed += self.options.pollInterval;
-        setTimeout(function () {
-          tick(self, done, fn, ...args);
-        }, self.options.pollInterval);
-      }
-    };
+  let tick = () =>
     self.evaluate_now(fn, ...args)
       .then((res) => {
-        waitDone(null, res);
-      }, (err) => {
-        waitDone(err);
+        if(res){ return Promise.resolve(); }
+
+        if (self.options.waitTimeout && waitMsPassed > self.options.waitTimeout) {
+          let error = new Error('.wait() timed out after '+self.options.waitTimeout+'msec');
+          return Promise.reject(error);
+        } else {
+          waitMsPassed += self.options.pollInterval;
+          return waitms(self, self.options.pollInterval)
+            .then(tick);
+        }
       });
-  }
+
+  return tick();
 }
 
 /**
