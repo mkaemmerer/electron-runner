@@ -2,7 +2,6 @@ import * as actions from './actions';
 let default_electron_path = require('electron-prebuilt');
 import proc     from 'child_process';
 import path     from 'path';
-import once     from 'once';
 import defaults from 'defaults';
 import child    from './ipc';
 
