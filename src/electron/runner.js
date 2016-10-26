@@ -308,7 +308,7 @@ app.on('ready', () => {
       done(error);
     };
 
-    let log = (event, args) => parent.emit.apply(parent, ['log'].concat(args));
+    let log = (event, args) => parent.emit('log', ...args);
 
     renderer.once('response', response);
     renderer.once('error', error);
