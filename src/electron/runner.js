@@ -58,6 +58,28 @@ if (!processArgs.dock && app.dock) {
   app.dock.hide();
 }
 
+
+/**
+ * Normalize Headers
+ */
+function toLoadURLOptions(headers){
+  let httpReferrer = '';
+  let extraHeaders = '';
+  for (let key in headers) {
+    if (key.toLowerCase() == 'referer') {
+      httpReferrer = headers[key];
+      continue;
+    }
+
+    extraHeaders += key + ': ' + headers[key] + '\n';
+  }
+  let loadUrlOptions = { extraHeaders: extraHeaders };
+  if(httpReferrer){
+    loadUrlOptions.httpReferrer = httpReferrer;
+  }
+  return loadUrlOptions;
+}
+
 /**
  * Listen for the app being "ready"
  */
@@ -158,22 +180,10 @@ app.on('ready', () => {
       return done(new Error('goto: `url` must be a non-empty string'));
     }
 
-    let httpReferrer = '';
-    let extraHeaders = '';
-    for (let key in headers) {
-      if (key.toLowerCase() == 'referer') {
-        httpReferrer = headers[key];
-        continue;
-      }
-
-      extraHeaders += key + ': ' + headers[key] + '\n';
-    }
-    let loadUrlOptions = { extraHeaders: extraHeaders };
-    httpReferrer && (loadUrlOptions.httpReferrer = httpReferrer);
-
     if (win.webContents.getURL() == url) {
       done();
     } else {
+      let loadUrlOptions = toLoadURLOptions(headers);
       let responseData = {};
       let domLoaded = false;
 
