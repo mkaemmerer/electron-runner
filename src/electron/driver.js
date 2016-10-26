@@ -57,42 +57,45 @@ function Driver(options = {}) {
   this._queue  = [];
   this.options = options;
 
-  this.queue((done) => {
+  this.queue(() => {
     this.proc = proc.spawn(electron_path, [runner, JSON.stringify(electronArgs)], {
       stdio: [null, null, null, 'ipc'],
       env: defaults(options.env || {}, process.env)
     });
 
-    this.proc.on('close', (code) => {
-      if(!this.ended){
-        handleExit(code, this, noop);
-      }
+    return new Promise((resolve) => {
+      this.proc.on('close', (code) => {
+        if(!this.ended){
+          handleExit(code, this, noop);
+        }
+      });
+
+      this.child = child(this.proc);
+
+      this.child.once('die', (err) => {
+        this.die = err;
+      });
+
+      // propagate console.log(...) through
+      this.child.on('log', (...args) => {
+        console.log(...args);
+      });
+
+      this.child.on('uncaughtException', (stack) => {
+        console.error('Driver runner error:\n\n%s\n', '\t' + stack.replace(/\n/g, '\n\t'));
+        endInstance(this, noop);
+        process.exit(1);
+      });
+
+      this.child.once('ready', () => {
+        this.child.call('browser-initialize', options)
+          .then(() => {
+            this.state = 'ready';
+            resolve();
+          });
+      });
     });
 
-    this.child = child(this.proc);
-
-    this.child.once('die', (err) => {
-      this.die = err;
-    });
-
-    // propagate console.log(...) through
-    this.child.on('log', (...args) => {
-      console.log(...args);
-    });
-
-    this.child.on('uncaughtException', (stack) => {
-      console.error('Driver runner error:\n\n%s\n', '\t' + stack.replace(/\n/g, '\n\t'));
-      endInstance(this, noop);
-      process.exit(1);
-    });
-
-    this.child.once('ready', () => {
-      this.child.call('browser-initialize', options)
-        .then(() => {
-          this.state = 'ready';
-          done();
-        });
-    });
   });
 }
 
@@ -151,9 +154,8 @@ function detachFromProcess(instance) {
  */
 
 Driver.prototype.goto = function(url, headers = {}) {
-  this.queue((done) => {
-    this.child.call('goto', url, headers, this.options.gotoTimeout)
-      .then(() => done(), (err) => done(err));
+  this.queue(() => {
+    return this.child.call('goto', url, headers, this.options.gotoTimeout);
   });
   return this;
 };
@@ -183,8 +185,12 @@ Driver.prototype.run = function(fn) {
       done.apply(this, err, res);
     }
     let [method, args] = item;
-    args.unshift(once(after));
-    method.apply(this, args);
+    method.apply(this, args)
+      .then((result) => {
+        after(null, result);
+      }, (err) => {
+        after(err)
+      });
   };
 
   let after = (err=this.die, res) => {
@@ -210,7 +216,7 @@ Driver.prototype.run = function(fn) {
  * normal API usage
  */
 
-Driver.prototype.evaluate_now = function(done, js_fn, ...args) {
+Driver.prototype.evaluate_now = function(js_fn, ...args) {
   let fn       = String(js_fn);
   let argsList = JSON.stringify(args).slice(1,-1);
 
@@ -226,9 +232,7 @@ Driver.prototype.evaluate_now = function(done, js_fn, ...args) {
   })()
   `;
 
-  this.child.call('javascript', source)
-    .then((result) => done(null, result), (err) => done(err));
-  return this;
+  return this.child.call('javascript', source);
 };
 
 /**
