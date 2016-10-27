@@ -69,13 +69,12 @@ function IPC(process) {
     }
 
     try {
-      responder((err, result) => {
-        if(err){
-          emitter.emit(`CALL_ERROR_${id}`, err);
-        } else {
+      responder(...args)
+        .then((result) => {
           emitter.emit(`CALL_RESULT_${id}`, result);
-        }
-      }, ...args);
+        }, (error) => {
+          emitter.emit(`CALL_ERROR_${id}`, error);
+        });
     } catch (error) {
       emitter.emit(`CALL_ERROR_${id}`, error);
     }

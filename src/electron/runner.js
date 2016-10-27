@@ -103,8 +103,7 @@ app.on('ready', () => {
    * create a browser window
    */
 
-  parent.respondTo('browser-initialize', (done, opts = {}) => {
-
+  parent.respondTo('browser-initialize', (opts = {}) => {
     options = defaults(opts, DEFAULT_OPTIONS);
 
     /**
@@ -178,24 +177,31 @@ app.on('ready', () => {
 
     setIsReady(true);
 
-    done();
+    return Promise.resolve();
   });
 
   /**
    * goto
    */
 
-  parent.respondTo('goto', (done, url, headers, timeout) => {
+  parent.respondTo('goto', (url, headers, timeout) => {
     if (!url || typeof url !== 'string') {
-      return done(new Error('goto: `url` must be a non-empty string'));
+      let error = new Error('goto: `url` must be a non-empty string');
+      return Promise.reject(error);
+    }
+    if (win.webContents.getURL() == url) {
+      return Promise.resolve();
     }
 
-    if (win.webContents.getURL() == url) {
-      done();
-    } else {
-      let loadUrlOptions = toLoadURLOptions(headers);
-      let responseData = {};
-      let domLoaded = false;
+    let loadUrlOptions = toLoadURLOptions(headers);
+    let responseData = {};
+    let domLoaded = false;
+
+    return new Promise((resolve, reject) => {
+      let done = (err, data) => {
+        if(err){ reject(err); }
+        resolve(data);
+      };
 
       let timer = setTimeout(() => {
         // If the DOM loaded before timing out, consider the load successful.
@@ -287,7 +293,8 @@ app.on('ready', () => {
       let protocol = urlFormat.parse(url).protocol;
       canLoadProtocol(protocol, (canLoad) => {
         if (canLoad) {
-          return startLoading();
+          startLoading();
+          return;
         }
 
         cleanup({
@@ -297,55 +304,60 @@ app.on('ready', () => {
           url: url
         });
       });
-    }
+    });
   });
 
   /**
    * javascript
    */
 
-  parent.respondTo('javascript', (done, src) => {
-    let response = (event, response) => {
-      renderer.removeListener('error', error);
-      renderer.removeListener('log', log);
-      done(null, response);
-    };
+  parent.respondTo('javascript', (src) => {
+    let ret = new Promise((resolve, reject) => {
+      let cleanup = () => {
+        renderer.removeListener('response', response);
+        renderer.removeListener('error', error);
+      };
+      let response = (event, resp) => {
+        cleanup();
+        resolve(resp);
+      };
+      let error = (event, err) => {
+        cleanup();
+        reject(err);
+      };
 
-    let error = (event, error) => {
-      renderer.removeListener('log', log);
-      renderer.removeListener('response', response);
-      done(error);
-    };
-
-    let log = (event, args) => parent.emit('log', ...args);
-
-    renderer.once('response', response);
-    renderer.once('error', error);
-    renderer.on('log', log);
+      renderer.on('response', response);
+      renderer.on('error', error);
+    });
 
     win.webContents.executeJavaScript(src);
+
+    return ret;
   });
 
   /**
    * size
    */
 
-  parent.respondTo('size', (done, width, height) => {
+  parent.respondTo('size', (width, height) => {
     win.setSize(width, height);
-    done();
+    return Promise.resolve();
   });
 
   /**
    * type
    */
 
-  parent.respondTo('type', (done, value) => {
+  parent.respondTo('type', (value) => {
     let chars = String(value).split('');
+
+    let wait = (time) =>
+      new Promise((resolve) => setTimeout(resolve, time));
 
     let type = () => {
       let ch = chars.shift();
       if (ch === undefined) {
-        return done();
+        return Promise.resolve();
       }
 
       // keydown
@@ -364,53 +376,36 @@ app.on('ready', () => {
         keyCode: ch
       });
 
-      setTimeout(type, options.typeInterval);
+      return wait(options.typeInterval).then(type);
     }
 
-    // start
-    type();
+    return type();
   })
 
   /**
    * screenshot
    */
 
-  parent.respondTo('screenshot', (done) => {
-    // https://gist.github.com/twolfson/0d374d9d7f26eefe7d38
-    frameManager.requestFrame(() => {
-      win.capturePage((img) => {
-        done(null, img.toPng());
+  parent.respondTo('screenshot', () => {
+    return new Promise((resolve) => {
+      // https://gist.github.com/twolfson/0d374d9d7f26eefe7d38
+      frameManager.requestFrame(() => {
+        win.capturePage((img) => {
+          resolve(img.toPng());
+        });
       });
     });
-  });
-
-  /**
-   * Add custom functionality
-   */
-
-  parent.respondTo('action', (done, name, fntext) => {
-    let fn = new Function('with(this){ return ' + fntext + '}')
-      .call({
-        require: require,
-        parent: parent
-      });
-    fn(name, options, parent, win, renderer, (error) => {
-      done(error);
-     });
   });
 
   /**
    * Continue
    */
 
-  parent.respondTo('continue', (done) => {
-    if (isReady()) {
-      done();
-    } else {
-      win.once('did-change-is-ready', () => {
-        done();
-      });
-    }
+  parent.respondTo('continue', () => {
+    let onChange = () =>
+      new Promise((resolve) => win.once('did-change-is-ready', resolve));
+
+    return isReady() ? Promise.resolve() : onChange();
   });
 
   /**
@@ -418,7 +413,7 @@ app.on('ready', () => {
    */
 
   let loginListener;
-  parent.respondTo('authentication', (done, login, password) => {
+  parent.respondTo('authentication', (login, password) => {
     let currentUrl;
     let tries = 0;
     if(loginListener){
@@ -440,16 +435,16 @@ app.on('ready', () => {
     }
     win.webContents.on('login', loginListener);
 
-    done();
+    return Promise.resolve();
   });
 
  /**
    * Kill the electron app
    */
 
-  parent.respondTo('quit', (done) => {
+  parent.respondTo('quit', () => {
     app.quit();
-    done();
+    return Promise.resolve();
   });
 
   /**
