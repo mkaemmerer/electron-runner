@@ -82,13 +82,33 @@ function toLoadURLOptions(headers){
 }
 // In most environments, loadURL handles this logic for us, but in some
 // it just hangs for unhandled protocols. Mitigate by checking ourselves.
-function canLoadProtocol(protocol, callback) {
-  protocol = (protocol || '').replace(/:$/, '');
+function canLoadProtocol(url) {
+  let protocol = urlFormat.parse(url).protocol || '';
+  protocol = protocol.replace(/:$/, '');
+
   if (!protocol || KNOWN_PROTOCOLS.includes(protocol)) {
-    callback(true);
+    return Promise.resolve(true);
   } else {
-    electron.protocol.isProtocolHandled(protocol, callback);
+    return new Promise((resolve, reject) => {
+      let done = (err, result) => {
+        if(err) reject(err);
+        if(!result){
+          reject({
+            message: 'navigation error',
+            code:    -1000,
+            details: 'unhandled protocol',
+            url:     url
+          });
+        }
+        resolve(result);
+      };
+      electron.protocol.isProtocolHandled(protocol, done);
+    });
   }
+}
+//Return a promise that resolves after {time}
+function wait(time){
+  return new Promise((resolve) => setTimeout(resolve, time));
 }
 
 
@@ -197,114 +217,112 @@ app.on('ready', () => {
     let responseData = {};
     let domLoaded = false;
 
-    return new Promise((resolve, reject) => {
-      let done = (err, data) => {
-        if(err){ reject(err); }
-        resolve(data);
-      };
-
-      let timer = setTimeout(() => {
-        // If the DOM loaded before timing out, consider the load successful.
-        let error = domLoaded ? undefined : {
-          message: 'navigation error',
-          code: -7, // chromium's generic networking timeout code
-          details: `Navigation timed out after ${timeout} ms`,
-          url: url
-        };
-        // Even if "successful," note that some things didn't finish.
-        responseData.details = `Not all resources loaded after ${timeout} ms`;
-        cleanup(error, responseData);
-      }, timeout);
-
+    let navigate = () => new Promise((resolve, reject) => {
       function handleFailure(event, code, detail, failedUrl, isMainFrame) {
         if (isMainFrame) {
-          cleanup({
+          let error = {
             message: 'navigation error',
-            code: code,
+            code:    code,
             details: detail,
-            url: failedUrl || url
-          });
+            url:     failedUrl || url
+          };
+          cleanup();
+          // wait a tick before notifying to resolve race conditions for events
+          setImmediate(() => reject(error));
         }
       }
-
       function handleDetails(event, status, newUrl, oldUrl, statusCode, method, referrer, headers, resourceType) {
         if (resourceType === 'mainFrame') {
           responseData = {
-            url: newUrl,
-            code: statusCode,
-            method: method,
+            url:      newUrl,
+            code:     statusCode,
+            method:   method,
             referrer: referrer,
-            headers: headers
+            headers:  headers
           };
         }
       }
-
-      function handleDomReady() { domLoaded = true; }
-
-      // We will have already unsubscribed if load failed, so assume success.
-      function handleFinish(event) {
-        cleanup(null, responseData);
+      function handleDomReady() {
+        domLoaded = true;
       }
-
-      function cleanup(error, data) {
-        clearTimeout(timer);
+      function handleFinish(event) {
+        // We will have already unsubscribed if load failed, so assume success.
+        cleanup();
+        // wait a tick before notifying to resolve race conditions for events
+        setImmediate(() => resolve(responseData));
+      }
+      function cleanup() {
         win.webContents.removeListener('did-fail-load',             handleFailure);
         win.webContents.removeListener('did-fail-provisional-load', handleFailure);
         win.webContents.removeListener('did-get-response-details',  handleDetails);
         win.webContents.removeListener('dom-ready',                 handleDomReady);
         win.webContents.removeListener('did-finish-load',           handleFinish);
         setIsReady(true);
-        // wait a tick before notifying to resolve race conditions for events
-        setImmediate(() => done(error, data));
       }
 
-      function startLoading() {
+
+      win.webContents.on('did-fail-load',             handleFailure);
+      win.webContents.on('did-fail-provisional-load', handleFailure);
+      win.webContents.on('did-get-response-details',  handleDetails);
+      win.webContents.on('dom-ready',                 handleDomReady);
+      win.webContents.on('did-finish-load',           handleFinish);
+
+      // javascript: URLs *may* trigger page loads; wait a bit to see
+      let protocol = urlFormat.parse(url).protocol || '';
+      if (protocol === 'javascript:') {
+        setTimeout(() => {
+          if (!win.webContents.isLoadingMainFrame()) {
+            let res = {
+              url:      url,
+              code:     200,
+              method:   'GET',
+              referrer: win.webContents.getURL(),
+              headers:  {}
+            };
+
+            cleanup();
+            resolve(res);
+          }
+        }, 10);
+      }
+
+      win.webContents.loadURL(url, loadUrlOptions);
+    });
+
+    let timer = wait(timeout)
+      .then(() => {
+        // Even if "successful," note that some things didn't finish.
+        responseData.details = `Not all resources loaded after ${timeout} ms`;
+        //Navigation error
+        let error = {
+          message: 'navigation error',
+          code: -7, // chromium's generic networking timeout code
+          details: `Navigation timed out after ${timeout} ms`,
+          url: url
+        };
+        setIsReady(true);
+        // If the DOM loaded before timing out, consider the load successful.
+        return domLoaded ? Promise.resolve(responseData) : Promise.reject(error);
+      });
+
+    let abortPending = () =>
+      new Promise((resolve) => {
         // abort any pending loads first
         if (win.webContents.isLoading()) {
           win.webContents.once('did-stop-loading', () => {
-            startLoading();
+            resolve();
           });
-          return win.webContents.stop();
+          win.webContents.stop();
+        } else {
+          resolve();
         }
-
-        win.webContents.on('did-fail-load',             handleFailure);
-        win.webContents.on('did-fail-provisional-load', handleFailure);
-        win.webContents.on('did-get-response-details',  handleDetails);
-        win.webContents.on('dom-ready',                 handleDomReady);
-        win.webContents.on('did-finish-load',           handleFinish);
-        win.webContents.loadURL(url, loadUrlOptions);
-
-        // javascript: URLs *may* trigger page loads; wait a bit to see
-        if (protocol === 'javascript:') {
-          setTimeout(() => {
-            if (!win.webContents.isLoadingMainFrame()) {
-              done(null, {
-                url: url,
-                code: 200,
-                method: 'GET',
-                referrer: win.webContents.getURL(),
-                headers: {}
-              });
-            }
-          }, 10);
-        }
-      }
-
-      let protocol = urlFormat.parse(url).protocol;
-      canLoadProtocol(protocol, (canLoad) => {
-        if (canLoad) {
-          startLoading();
-          return;
-        }
-
-        cleanup({
-          message: 'navigation error',
-          code: -1000,
-          details: 'unhandled protocol',
-          url: url
-        });
       });
-    });
+
+    let goto = canLoadProtocol(url)
+      .then(abortPending)
+      .then(navigate);
+
+    return Promise.race([timer, goto]);
   });
 
   /**
@@ -350,9 +368,6 @@ app.on('ready', () => {
 
   parent.respondTo('type', (value) => {
     let chars = String(value).split('');
-
-    let wait = (time) =>
-      new Promise((resolve) => setTimeout(resolve, time));
 
     let type = () => {
       let ch = chars.shift();
