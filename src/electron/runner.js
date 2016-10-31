@@ -141,7 +141,6 @@ app.on('ready', () => {
       }
     }
 
-
     frameManager = FrameManager(win);
 
     /**
@@ -157,44 +156,20 @@ app.on('ready', () => {
     renderer.on('page', (sender, ...args) => {
       parent.emit('page', ...args);
     });
-
     renderer.on('console', (sender, type, ...args) => {
       parent.emit('console', type, ...args);
     });
 
-    win.webContents.on('did-finish-load',           forward('did-finish-load'));
-    win.webContents.on('did-fail-load',             forward('did-fail-load'));
-    win.webContents.on('did-fail-provisional-load', forward('did-fail-provisional-load'));
-    win.webContents.on('did-frame-finish-load',     forward('did-frame-finish-load'));
-    win.webContents.on('did-start-loading',         forward('did-start-loading'));
-    win.webContents.on('did-stop-loading',          forward('did-stop-loading'));
-    win.webContents.on('did-get-response-details',  forward('did-get-response-details'));
-    win.webContents.on('did-get-redirect-request',  forward('did-get-redirect-request'));
-    win.webContents.on('dom-ready',                 forward('dom-ready'));
-    win.webContents.on('page-favicon-updated',      forward('page-favicon-updated'));
-    win.webContents.on('new-window',                forward('new-window'));
-    win.webContents.on('will-navigate',             forward('will-navigate'));
-    win.webContents.on('crashed',                   forward('crashed'));
-    win.webContents.on('plugin-crashed',            forward('plugin-crashed'));
-    win.webContents.on('destroyed',                 forward('destroyed'));
     win.webContents.on('close', (e) => { closed = true; });
 
-    let loadwatch;
     win.webContents.on('did-start-loading', () => {
       if (win.webContents.isLoadingMainFrame()) {
-        if(options.loadTimeout){
-          loadwatch = setTimeout(() => {
-            win.webContents.stop();
-          }, options.loadTimeout);
-        }
         setIsReady(false);
       }
     });
     win.webContents.on('did-stop-loading', () => {
-      clearTimeout(loadwatch);
       setIsReady(true);
     });
-
     setIsReady(true);
 
     return Promise.resolve();
@@ -483,20 +458,6 @@ app.on('ready', () => {
       win[IS_READY] = ready;
       win.emit('did-change-is-ready', ready);
     }
-  }
-
-  /**
-   * Forward events
-   */
-
-  function forward(name) {
-    return (event, ...args) => {
-      // NOTE: the raw Electron event used to be forwarded here, but we now send
-      // an empty event in its place -- the raw event is not JSON serializable.
-      if(!closed) {
-        parent.emit(name, {}, ...args);
-      }
-    };
   }
 
 });
