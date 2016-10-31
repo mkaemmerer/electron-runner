@@ -209,19 +209,7 @@ Driver.prototype.evaluate_now = function(js_fn, ...args) {
   let fn       = String(js_fn);
   let argsList = JSON.stringify(args).slice(1,-1);
 
-  let source = `
-  (function javascript () {
-    var ipc = __electron_runner.ipc;
-    try {
-      var response = (${fn})(${argsList});
-      ipc.send('response', response);
-    } catch (e) {
-      ipc.send('error', e.message);
-    }
-  })()
-  `;
-
-  return this.child.call('javascript', source);
+  return this.child.call('javascript', `(${fn})(${argsList})`);
 };
 
 /**

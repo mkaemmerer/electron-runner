@@ -147,13 +147,23 @@ Window.prototype.abortPending = function(){
 /**
  * javascript {src}
  */
-Window.prototype.javascript = function(src){
+Window.prototype.javascript = function(source){  
   let ret = new Promise((resolve, reject) => {
     renderer.once('response', (_, res) => resolve(res));
     renderer.once('error',    (_, err) => reject(err));
   });
 
-  this.webContents.executeJavaScript(src);
+  this.webContents.executeJavaScript(`
+  (function javascript () {
+    var ipc = __electron_runner.ipc;
+    try {
+      var response = ${source};
+      ipc.send('response', response);
+    } catch (e) {
+      ipc.send('error', e.message);
+    }
+  })()
+  `);
 
   return ret;
 };
