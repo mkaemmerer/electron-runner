@@ -157,10 +157,7 @@ Driver.prototype.run = function() {
 
   let step = (item) => {
     let [method, args] = item;
-    return method.apply(this, args)
-      .then((res) =>
-        cont().then(() => Promise.resolve(res))
-      );
+    return method.apply(this, args);
   };
 
   let cleanup = () => {
@@ -168,21 +165,16 @@ Driver.prototype.run = function() {
     return this.ending ? endInstance(this) : Promise.resolve();
   };
 
-  let next = (res) => {
-    let item = steps.shift();
-
-    if (!item) {
-      return Promise.resolve(res);
-    }
-
-    return step(item).then(next);
-  };
-
-  return next()
-    .then((res) => {
-      return cleanup()
-        .then(() => Promise.resolve(res));
-    })
+  return steps.reduce(
+      (last, item) => last
+        .then(cont)
+        .then(() => step(item)),
+      Promise.resolve()
+    )
+    .then((res) =>
+      cleanup()
+        .then(() => Promise.resolve(res))
+    )
     .catch((err) => {
       console.error(err);
       endInstance(this);
