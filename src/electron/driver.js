@@ -50,10 +50,6 @@ function Driver(options = {}) {
 
     this.child = child(this.proc);
 
-    this.child.once('die', (err) => {
-      this.die = err;
-    });
-
     // propagate console.log(...) through
     this.child.on('log', (...args) => {
       console.log(...args);
@@ -175,10 +171,6 @@ Driver.prototype.run = function() {
   let next = (res) => {
     let item = steps.shift();
 
-    // Immediately halt execution if an error has been thrown, or we have no more queued up steps.
-    if(this.die){
-      return Promise.reject(this.die);
-    }
     if (!item) {
       return Promise.resolve(res);
     }
