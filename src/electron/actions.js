@@ -165,14 +165,3 @@ export function screenshot(path){
       });
     });
 };
-
-/**
- * Authentication
- *
- * @param {String} login
- * @param {String} password
- */
-
- export function authentication(login, password){
-   return this.child.call('authentication', login, password);
- };

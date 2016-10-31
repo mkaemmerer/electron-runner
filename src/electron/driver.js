@@ -190,9 +190,10 @@ Driver.prototype.run = function() {
     .then((res) => {
       return cleanup()
         .then(() => Promise.resolve(res));
-    }, (err) => {
-      return cleanup()
-        .then(() => Promise.reject(err));
+    })
+    .catch((err) => {
+      console.error(err);
+      endInstance(this);
     });
 };
 
