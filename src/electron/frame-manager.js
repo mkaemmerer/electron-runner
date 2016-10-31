@@ -12,11 +12,10 @@ const RENDER_ELEMENT_ID = '__ELECTRON_RUNNER_RENDER__';
  */
 function FrameManager(window) {
   EventEmitter.call(this);
-  let subscribed     = false;
   let requestedFrame = false;
 
   let subscribe = (eventName) => {
-    if (!subscribed && eventName === 'data') {
+    if (eventName === 'data') {
       window.webContents.beginFrameSubscription(receiveFrame);
     }
   }
@@ -24,7 +23,6 @@ function FrameManager(window) {
   let unsubscribe = () => {
     if (!this.listenerCount('data')) {
       window.webContents.endFrameSubscription();
-      subscribed = false;
     }
   }
 
