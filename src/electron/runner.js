@@ -1,6 +1,7 @@
 let electron      = require('electron');
 let defaults      = require('deep-defaults');
 let path          = require('path');
+let urlFormat     = require('url');
 let BrowserWindow = electron.BrowserWindow;
 let renderer      = electron.ipcMain;
 let app           = electron.app;
@@ -18,8 +19,6 @@ const DEFAULT_OPTIONS = {
 };
 // URL protocols that don't need to be checked for validity
 const KNOWN_PROTOCOLS = ['http', 'https', 'file', 'about', 'javascript'];
-// Property for tracking whether a window is ready for interaction
-const IS_READY = Symbol('isReady');
 
 /**
  * Handle uncaught exceptions in the main electron process
@@ -99,7 +98,26 @@ app.on('ready', () => {
    */
 
   parent.respondTo('goto', (url, headers, timeout) => {
-    return win.goto(url, headers, timeout);
+    if (!url || typeof url !== 'string') {
+      let error = new Error('navigate: `url` must be a non-empty string');
+      return Promise.reject(error);
+    }
+
+    let timer = wait(timeout)
+      //Navigation error
+      .then(() =>
+        Promise.reject({
+          message: 'navigation error',
+          code: -7, // chromium's generic networking timeout code
+          details: `Navigation timed out after ${timeout} ms`,
+          url: url
+        }));
+
+    let goto = canLoadProtocol(url)
+      .then(() => win.abortPending())
+      .then(() => win.navigate(url, headers));
+
+    return Promise.race([timer, goto]);
   });
 
   /**
@@ -111,10 +129,10 @@ app.on('ready', () => {
   });
 
   /**
-   * setSize
+   * viewport
    */
 
-  parent.respondTo('size', (width, height) => {
+  parent.respondTo('viewport', (width, height) => {
     return win.setSize(width, height);
   });
 
@@ -123,7 +141,16 @@ app.on('ready', () => {
    */
 
   parent.respondTo('type', (value) => {
-    return win.type(value, options.typeInterval);
+    let chars = String(value).split('');
+
+    let type = (ch) =>
+      win.sendKey(ch)
+        .then(() => wait(options.typeInterval));
+
+    return chars.reduce(
+      (last, ch) => last.then(() => type(ch)),
+      Promise.resolve()
+    );
   });
 
   /**
@@ -158,3 +185,36 @@ app.on('ready', () => {
   parent.emit('ready');
 
 });
+
+
+//Return a promise that resolves after {time}
+function wait(time){
+  return new Promise((resolve) => setTimeout(resolve, time));
+}
+
+// In most environments, loadURL handles this logic for us, but in some
+// it just hangs for unhandled protocols. Mitigate by checking ourselves.
+function canLoadProtocol(url) {
+  let protocol = urlFormat.parse(url).protocol || '';
+  protocol = protocol.replace(/:$/, '');
+
+  if (!protocol || KNOWN_PROTOCOLS.includes(protocol)) {
+    return Promise.resolve(true);
+  } else {
+    return new Promise((resolve, reject) => {
+      let done = (err, result) => {
+        if(err) reject(err);
+        if(!result){
+          reject({
+            message: 'navigation error',
+            code:    -1000,
+            details: 'unhandled protocol',
+            url:     url
+          });
+        }
+        resolve(result);
+      };
+      electron.protocol.isProtocolHandled(protocol, done);
+    });
+  }
+}

@@ -91,7 +91,7 @@ function waitms (self, ms) {
 
 function waitelem (self, selector) {
   let elementPresent = function(selector){
-    return (document.querySelector(selector) ? true : false);
+    return document.querySelector(selector) ? true : false;
   };
   return waitfn(self, elementPresent, selector);
 }
@@ -147,7 +147,7 @@ export function evaluate(fn, ...args){
  */
 
 export function viewport(width, height){
-  return this.child.call('size', width, height);
+  return this.child.call('viewport', width, height);
 };
 
 /**
