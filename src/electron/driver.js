@@ -29,8 +29,6 @@ const DEFAULT_OPTIONS = {
 function Driver(options = {}) {
   options = defaults(options, DEFAULT_OPTIONS);
 
-  // initial state
-  this.state   = 'initial';
   this.running = false;
   this.ending  = false;
   this.ended   = false;
@@ -68,10 +66,7 @@ function Driver(options = {}) {
     return new Promise((resolve) => {
       this.child.once('ready', () => {
         this.child.call('browser-initialize', options)
-          .then(() => {
-            this.state = 'ready';
-            resolve();
-          });
+          .then(resolve);
       });
     });
 
@@ -215,30 +210,16 @@ Driver.prototype.then = function(fulfill, reject) {
     .then(fulfill, reject);
 };
 
-
-/**
- * Static: Support attaching custom actions
- *
- * @param {String} name - method name
- * @param {Function|Object} parentfn - Driver implementation
- * @return {Driver}
- */
-
-Driver.action = function(name, parentfn) {
-  Driver.prototype[name] = function(...args){
-    this._queue.push([parentfn, args]);
-    return this;
-  };
-  return Driver;
-}
-
 /**
  * Attach all the actions.
  */
 
 Object.keys(actions).forEach((name) => {
   let fn = actions[name];
-  Driver.action(name, fn);
+  Driver.prototype[name] = function(...args){
+    this._queue.push([fn, args]);
+    return this;
+  };
 });
 
 /**
