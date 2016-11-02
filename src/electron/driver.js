@@ -29,8 +29,6 @@ const DEFAULT_OPTIONS = {
 function Driver(options = {}) {
   options = defaults(options, DEFAULT_OPTIONS);
 
-  this.running = false;
-  this.ending  = false;
   this.ended   = false;
   this._queue  = [];
   this.options = options;
@@ -132,7 +130,6 @@ function detachFromProcess(instance) {
 
 Driver.prototype.run = function() {
   let steps = this._queue;
-  this.running = true;
   this._queue = [];
 
   let cont = () => this.child ? this.child.call('continue') : Promise.resolve();
@@ -142,20 +139,11 @@ Driver.prototype.run = function() {
     return method.apply(this, args);
   };
 
-  let cleanup = () => {
-    this.running = false;
-    return this.ending ? endInstance(this) : Promise.resolve();
-  };
-
   return steps.reduce(
       (last, item) => last
         .then(cont)
         .then(() => step(item)),
       Promise.resolve()
-    )
-    .then((res) =>
-      cleanup()
-        .then(() => Promise.resolve(res))
     )
     .catch((err) => {
       console.error(err);
@@ -183,12 +171,7 @@ Driver.prototype.evaluate_now = function(js_fn, ...args) {
  */
 
 Driver.prototype.end = function() {
-  this.ending = true;
-
-  if (!this.running && !this.ended) {
-    this.run();
-  }
-
+  this.queue(() => endInstance(this));
   return this;
 };
 
@@ -217,7 +200,7 @@ Driver.prototype.then = function(fulfill, reject) {
 Object.keys(actions).forEach((name) => {
   let fn = actions[name];
   Driver.prototype[name] = function(...args){
-    this._queue.push([fn, args]);
+    this.queue(fn, ...args);
     return this;
   };
 });
