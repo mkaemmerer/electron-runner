@@ -1,5 +1,14 @@
 import fs from 'fs';
 
+/**
+ * Go to a `url`
+ * @param {String} url
+ * @param {Object} headers
+ */
+
+export function goto(url, headers = {}) {
+  return this.child.call('goto', url, headers, this.options.gotoTimeout);
+};
 
 /**
  * Helper functions for type() to focus/blur

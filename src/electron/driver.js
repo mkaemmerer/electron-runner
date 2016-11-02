@@ -12,8 +12,6 @@ const DEFAULT_OPTIONS = {
   waitTimeout:  30 * 1000,
   typeInterval: 100,
   pollInterval: 250,
-  //Retries
-  maxAuthRetries: 3,
   //Electron
   electronPath: default_electron_path,
   electronArgs: {
@@ -132,17 +130,6 @@ function detachFromProcess(instance) {
   process.removeListener('SIGHUP',   instance._endNow);
   process.removeListener('SIGBREAK', instance._endNow);
 }
-
-/**
- * Go to a `url`
- */
-
-Driver.prototype.goto = function(url, headers = {}) {
-  this.queue(() => {
-    return this.child.call('goto', url, headers, this.options.gotoTimeout);
-  });
-  return this;
-};
 
 /**
  * run
