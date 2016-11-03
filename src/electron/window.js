@@ -147,7 +147,7 @@ Window.prototype.abortPending = function(){
 /**
  * javascript {src}
  */
-Window.prototype.javascript = function(source){  
+Window.prototype.javascript = function(source){
   let ret = new Promise((resolve, reject) => {
     renderer.once('response', (_, res) => resolve(res));
     renderer.once('error',    (_, err) => reject(err));

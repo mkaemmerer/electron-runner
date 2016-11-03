@@ -71,7 +71,12 @@ app.on('ready', () => {
   app.on('browser-window-created', (event, win) => {
     //Wait for browser window to have an ID
     setImmediate(() => {
+      let focused = BrowserWindow.getFocusedWindow();
       windows[win.id] = Window(win, options);
+
+      if(focused){
+        focusedWindow = windows[focused.id];
+      }
     });
   });
 
