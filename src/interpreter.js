@@ -1,4 +1,5 @@
-import Nightmare from 'nightmare';
+import Driver from './electron/driver';
+import Free from './free';
 import Task from './task';
 
 const DEFAULT_OPTIONS = {
@@ -23,15 +24,13 @@ let interpret = (program, browser) => {
   return program.foldRun(start, step, done);
 };
 
-let run = (program, options = DEFAULT_OPTIONS) => {
-  let browser = Nightmare(options);
-  let result  = interpret(program, browser);
+let end = Free.impure(Free.pure, {name: 'end', args: []});
 
-  result
-    .run(n => {
-      console.log('END');
-      n.end().then(() => {});
-    });
+let run = (program, options = DEFAULT_OPTIONS) => {
+  let browser = Driver(options);
+  let result  = interpret(program.flatMap(() => end), browser);
+
+  result.run(() => {});
 
   return result;
 };
