@@ -129,6 +129,10 @@ function detachFromProcess(instance) {
  */
 
 Driver.prototype.run = function() {
+  if(this.ended){
+    return Promise.reject(new Error('process ended'));
+  }
+
   let steps = this._queue;
   this._queue = [];
 

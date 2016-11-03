@@ -62,7 +62,23 @@ if (!processArgs.dock && app.dock) {
  */
 
 app.on('ready', () => {
-  let win, options;
+  let focusedWindow, options;
+  let windows = {};
+
+  /**
+   * Handle window creation and focus
+   */
+  app.on('browser-window-created', (event, win) => {
+    //Wait for browser window to have an ID
+    setImmediate(() => {
+      windows[win.id] = Window(win, options);
+    });
+  });
+
+  app.on('browser-window-focus', (event, win) => {
+    focusedWindow = windows[win.id];
+  });
+
 
   /**
    * create a browser window
@@ -77,7 +93,7 @@ app.on('ready', () => {
      * https://github.com/atom/electron/blob/master/docs/api/browser-window.md
      */
 
-    win = Window(new BrowserWindow(options), options, parent);
+    new BrowserWindow(options);
 
     /**
      * Pass along web content events
@@ -103,6 +119,8 @@ app.on('ready', () => {
       return Promise.reject(error);
     }
 
+    let win = focusedWindow;
+
     let timer = wait(timeout)
       //Navigation error
       .then(() =>
@@ -125,7 +143,7 @@ app.on('ready', () => {
    */
 
   parent.respondTo('javascript', (src) => {
-    return win.javascript(src);
+    return focusedWindow.javascript(src);
   });
 
   /**
@@ -133,7 +151,7 @@ app.on('ready', () => {
    */
 
   parent.respondTo('viewport', (width, height) => {
-    return win.setSize(width, height);
+    return focusedWindow.setSize(width, height);
   });
 
   /**
@@ -141,6 +159,7 @@ app.on('ready', () => {
    */
 
   parent.respondTo('type', (value) => {
+    let win = focusedWindow;
     let chars = String(value).split('');
 
     let type = (ch) =>
@@ -158,7 +177,7 @@ app.on('ready', () => {
    */
 
   parent.respondTo('screenshot', () => {
-    return win.screenshot();
+    return focusedWindow.screenshot();
   });
 
   /**
@@ -166,7 +185,7 @@ app.on('ready', () => {
    */
 
   parent.respondTo('continue', () => {
-    return win.continue();
+    return focusedWindow.continue();
   });
 
   /**
