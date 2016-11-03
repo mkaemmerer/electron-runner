@@ -133,16 +133,12 @@ Driver.prototype.run = function() {
   this._queue = [];
 
   let cont = () => this.child ? this.child.call('continue') : Promise.resolve();
-
-  let step = (item) => {
-    let [method, args] = item;
-    return method.apply(this, args);
-  };
+  let step = ([method, args]) => method.apply(this, args);
 
   return steps.reduce(
-      (last, item) => last
+      (last, next) => last
         .then(cont)
-        .then(() => step(item)),
+        .then(() => step(next)),
       Promise.resolve()
     )
     .catch((err) => {
