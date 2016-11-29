@@ -45,6 +45,9 @@ function Driver(options = {}) {
     this.child = child(this.proc);
 
     // propagate console.log(...) through
+    this.child.on('console', (type, ...args) => {
+      console[type](...args);
+    });
     this.child.on('log', (...args) => {
       console.log(...args);
     });
