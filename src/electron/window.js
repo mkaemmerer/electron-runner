@@ -149,18 +149,45 @@ Window.prototype.abortPending = function(){
  */
 Window.prototype.javascript = function(source){
   let ret = new Promise((resolve, reject) => {
-    renderer.once('response', (_, res) => resolve(res));
-    renderer.once('error',    (_, err) => reject(err));
+    renderer.once('javascript', (_, type, res) => {
+      if(type === 'response'){
+        resolve(res);
+      } else {
+        reject(res);
+      }
+    });
   });
 
   this.webContents.executeJavaScript(`
   (function javascript () {
-    var ipc = __electron_runner.ipc;
+    function sendResponse(r){
+      if(window.__electron_runner){
+        __electron_runner.ipc.send('javascript', 'response', r);
+      } else {
+        window.opener.postMessage({
+          name: 'javascript',
+          type: 'response',
+          data: r
+        });
+      }
+    }
+    function sendError(e){
+      if(window.__electron_runner){
+        __electron_runner.ipc.send('javascript', 'error', e.message);
+      } else {
+        window.opener.postMessage({
+          name: 'javascript',
+          type: 'error',
+          data: e.message
+        });
+      }
+    }
+
     try {
       var response = ${source};
-      ipc.send('response', response);
-    } catch (e) {
-      ipc.send('error', e.message);
+      sendResponse(response);
+    } catch (error) {
+      sendError(error);
     }
   })()
   `);

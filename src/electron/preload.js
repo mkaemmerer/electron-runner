@@ -6,6 +6,13 @@ window.addEventListener('error', function(e) {
   __electron_runner.ipc.send('page', 'error', e.message, e.error.stack);
 });
 
+window.addEventListener('message', function(e){
+  var message = e.data;
+  if(message.name === 'javascript'){
+    __electron_runner.ipc.send('javascript', message.type, message.data);
+  }
+});
+
 (function(){
   // listen for console.log
   var defaultLog = console.log;
