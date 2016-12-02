@@ -74,6 +74,9 @@ app.on('ready', () => {
       let focused = BrowserWindow.getFocusedWindow();
       windows[win.id] = Window(win, options);
 
+      if(!focusedWindow){
+        focusedWindow = windows[win.id];
+      }
       if(focused){
         focusedWindow = windows[focused.id];
       }
@@ -81,6 +84,7 @@ app.on('ready', () => {
   });
 
   app.on('browser-window-focus', (event, win) => {
+    parent.emit('log', 'childwindowfocus');
     focusedWindow = windows[win.id];
   });
 
