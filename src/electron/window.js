@@ -147,7 +147,7 @@ Window.prototype.abortPending = function(){
 /**
  * javascript {src}
  */
-Window.prototype.javascript = function(source){  
+Window.prototype.javascript = function(source){
   let ret = new Promise((resolve, reject) => {
     renderer.once('response', (_, res) => resolve(res));
     renderer.once('error',    (_, err) => reject(err));
@@ -203,10 +203,9 @@ Window.prototype.sendKey = function(ch){
  */
 Window.prototype.screenshot = function(){
   return new Promise((resolve) => {
-    // https://gist.github.com/twolfson/0d374d9d7f26eefe7d38
     this.frameManager.requestFrame(() => {
       this.win.capturePage((img) => {
-        resolve(img.toPng());
+        resolve(img.toPNG());
       });
     });
   });
