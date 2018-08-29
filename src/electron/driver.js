@@ -3,7 +3,7 @@ import proc     from 'child_process';
 import path     from 'path';
 import defaults from 'deep-defaults';
 import child    from './ipc';
-import default_electron_path from 'electron-prebuilt';
+import default_electron_path from 'electron';
 
 
 const DEFAULT_OPTIONS = {
